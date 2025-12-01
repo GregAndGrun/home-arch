@@ -6,10 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
-import { GateType, GateState, GatesStatusResponse } from '../types';
-import ApiService from '../services/ApiService';
+import { GateType, GateState } from '../types';
 import NetInfo from '@react-native-community/netinfo';
 import SplitScreen from '../components/Layout/SplitScreen';
 import { useTheme } from '../theme/useTheme';
@@ -23,10 +21,6 @@ interface GatesScreenProps {
 
 const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
   const { colors } = useTheme();
-  const [gatesStatus, setGatesStatus] = useState<GatesStatusResponse>({
-    entrance: { state: GateState.UNKNOWN, hasSensor: false, lastAction: 0 },
-    garage: { state: GateState.UNKNOWN, hasSensor: false, lastAction: 0 },
-  });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
@@ -36,35 +30,13 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
       setIsConnected(state.isConnected ?? false);
     });
 
-    loadGatesStatus();
-
-    const interval = setInterval(() => {
-      loadGatesStatus(true);
-    }, 5000);
-
     return () => {
       unsubscribe();
-      clearInterval(interval);
     };
   }, []);
 
-  const loadGatesStatus = async (silent: boolean = false) => {
-    if (!silent) setLoading(true);
-
-    try {
-      const status = await ApiService.getGatesStatus();
-      setGatesStatus(status);
-    } catch (error: any) {
-      console.error('Error loading gates status:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
   const handleRefresh = () => {
-    setRefreshing(true);
-    loadGatesStatus();
+    setRefreshing(false);
   };
 
   const getStateColor = (state: GateState): string => {
@@ -92,28 +64,58 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
     gateType: GateType;
     state: GateState;
     onPress: () => void;
-  }> = ({ title, gateType, state, onPress }) => {
-    // Different icons for different gates
-    const gateIcon = gateType === GateType.GARAGE 
-      ? 'home' // Garage gate icon (home)
-      : 'directions-car'; // Entrance gate icon (car) or 'fence' if available
+    disabled?: boolean;
+  }> = ({ title, gateType, state, onPress, disabled = false }) => {
+    // Different icons for different gates/rolets
+    const getGateIcon = () => {
+      switch (gateType) {
+        case GateType.GARAGE:
+          return 'home'; // Garage gate icon
+        case GateType.ENTRANCE:
+          return 'directions-car'; // Entrance gate icon
+        case GateType.TERRACE_FIX:
+        case GateType.TERRACE_DOOR:
+          return 'blinds'; // Blinds icon for rolets
+        default:
+          return 'home';
+      }
+    };
     
     return (
       <TouchableOpacity
-        style={[styles.gateCard, { backgroundColor: colors.card }]}
-        onPress={onPress}
-        activeOpacity={0.7}
+        style={[
+          styles.gateCard,
+          { backgroundColor: colors.card },
+          disabled && styles.gateCardDisabled,
+        ]}
+        onPress={disabled ? undefined : onPress}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled}
       >
         <View style={styles.gateCardContent}>
           <View style={styles.gateIconContainer}>
-            <MaterialIcons name={gateIcon} size={32} color={colors.textPrimary} />
+            <MaterialIcons
+              name={getGateIcon()}
+              size={32}
+              color={disabled ? colors.textSecondary : colors.textPrimary}
+            />
           </View>
           <View style={styles.gateInfo}>
-            <Text style={[styles.gateTitle, { color: colors.textPrimary, fontFamily: typography.fontFamily.semiBold }]}>
+            <Text
+              style={[
+                styles.gateTitle,
+                {
+                  color: disabled ? colors.textSecondary : colors.textPrimary,
+                  fontFamily: typography.fontFamily.semiBold,
+                },
+              ]}
+            >
               {title}
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={32} color={colors.textSecondary} />
+          {!disabled && (
+            <MaterialIcons name="chevron-right" size={32} color={colors.textSecondary} />
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -141,28 +143,38 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />
         }
       >
-        {loading && !refreshing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Ładowanie statusu bram...</Text>
-          </View>
-        ) : (
-          <>
+        <>
             <GateListItem
               title="Brama Garażowa"
               gateType={GateType.GARAGE}
-              state={gatesStatus.garage.state}
+              state={GateState.UNKNOWN}
               onPress={() => onGatePress(GateType.GARAGE)}
             />
 
             <GateListItem
               title="Brama Wjazdowa"
               gateType={GateType.ENTRANCE}
-              state={gatesStatus.entrance.state}
+              state={GateState.UNKNOWN}
               onPress={() => onGatePress(GateType.ENTRANCE)}
+              disabled={true}
             />
-          </>
-        )}
+
+            <GateListItem
+              title="Roleta taras (fix)"
+              gateType={GateType.TERRACE_FIX}
+              state={GateState.UNKNOWN}
+              onPress={() => onGatePress(GateType.TERRACE_FIX)}
+              disabled={true}
+            />
+
+            <GateListItem
+              title="Roleta taras (drzwi)"
+              gateType={GateType.TERRACE_DOOR}
+              state={GateState.UNKNOWN}
+              onPress={() => onGatePress(GateType.TERRACE_DOOR)}
+              disabled={true}
+            />
+        </>
       </ScrollView>
     </SplitScreen>
   );
@@ -214,6 +226,9 @@ const styles = StyleSheet.create({
   },
   gateTitle: {
     fontSize: 18,
+  },
+  gateCardDisabled: {
+    opacity: 0.5,
   },
   loadingContainer: {
     flex: 1,

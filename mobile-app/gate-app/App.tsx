@@ -14,12 +14,13 @@ import VpnStatusBanner from './src/components/VpnStatusBanner';
 import { StorageService } from './src/services/StorageService';
 import NotificationService from './src/services/NotificationService';
 import { SmartDevice, GateType, DeviceCategory, CategoryType } from './src/types';
-import { ThemeProvider } from './src/theme/ThemeContext';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { useGatewayReachability } from './src/hooks/useGatewayReachability';
 
 type Screen = 'home' | 'gates' | 'gate-detail' | 'settings' | 'category-devices';
 
 function AppContent() {
+  const { colors } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLocked, setIsLocked] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +32,24 @@ function AppContent() {
   const { status: gatewayStatus, message: gatewayMessage, refresh: refreshGatewayStatus } =
     useGatewayReachability();
 
+  // Delay initial gateway check to avoid blocking app startup
   useEffect(() => {
+    const timer = setTimeout(() => {
+      refreshGatewayStatus();
+    }, 2000); // Wait 2 seconds after app starts before checking gateway
+    
+    return () => clearTimeout(timer);
+  }, [refreshGatewayStatus]);
+
+  useEffect(() => {
+    // Safety timeout - always set loading to false after max 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn('[App] Loading timeout - forcing app to continue');
+        setIsLoading(false);
+      }
+    }, 5000);
+
     checkAuthentication();
     
     const subscription = AppState.addEventListener('change', async (nextAppState) => {
@@ -46,7 +64,6 @@ function AppContent() {
     
     // Listen for token expiration events
     const handleTokenExpired = async () => {
-      console.log('Token expired event received, logging out...');
       await handleLogout();
     };
     
@@ -55,6 +72,7 @@ function AppContent() {
     }
     
     return () => {
+      clearTimeout(safetyTimeout);
       subscription.remove();
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('token-expired', handleTokenExpired);
@@ -83,28 +101,30 @@ function AppContent() {
 
     const setupNotifications = async () => {
       try {
-        const initialized = await NotificationService.initialize();
+        // Add timeout to notification initialization to avoid blocking app
+        const initPromise = NotificationService.initialize();
+        const timeoutPromise = new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error('Notification init timeout')), 5000)
+        );
+        
+        const initialized = await Promise.race([initPromise, timeoutPromise]) as boolean;
         if (initialized) {
           // Subscribe to VPN notifications
           unsubscribe = NotificationService.subscribe((vpnNotification) => {
-            console.log('VPN notification received:', vpnNotification);
-            
             // If VPN is connected, immediately check gateway availability
             if (vpnNotification.type === 'connected') {
-              console.log('VPN connected, checking gateway availability...');
               // Wait a moment for VPN to fully establish connection
               setTimeout(() => {
                 refreshGatewayStatus();
               }, 1000); // 1 second delay to allow VPN to establish
             } else if (vpnNotification.type === 'disconnected') {
-              console.log('VPN disconnected');
-              // Optionally refresh to update status
               refreshGatewayStatus();
             }
           });
         }
       } catch (error) {
-        console.error('Error setting up notifications:', error);
+        // Don't block app if notifications fail - just log and continue
+        console.warn('[App] Notification service initialization failed (non-critical):', error);
       }
     };
 
@@ -124,24 +144,38 @@ function AppContent() {
   };
 
   const checkAuthentication = async () => {
+    // Add timeout to prevent infinite loading
+    const timeoutPromise = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        console.warn('[App] Authentication check timeout - continuing anyway');
+        resolve();
+      }, 3000); // 3 second timeout
+    });
+
     try {
-      const token = await StorageService.getToken();
-      if (token) {
-        // Verify token is still valid
-        if (StorageService.isTokenValid(token)) {
-          setIsAuthenticated(true);
+      const authPromise = (async () => {
+        const token = await StorageService.getToken();
+        
+        if (token) {
+          // Verify token is still valid
+          if (StorageService.isTokenValid(token)) {
+            setIsAuthenticated(true);
+          } else {
+            // Token expired, logout
+            await handleLogout();
+          }
         } else {
-          // Token expired, logout
-          console.log('Token expired during authentication check, logging out...');
-          await handleLogout();
+          setIsAuthenticated(false);
         }
-      } else {
-        setIsAuthenticated(false);
-      }
+      })();
+
+      // Race between auth check and timeout
+      await Promise.race([authPromise, timeoutPromise]);
     } catch (error) {
-      console.error('Error checking authentication:', error);
+      console.error('[App] Error checking authentication:', error);
       setIsAuthenticated(false);
     } finally {
+      // Always set loading to false, even if there was an error or timeout
       setIsLoading(false);
     }
   };
@@ -231,7 +265,7 @@ function AppContent() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B35" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }

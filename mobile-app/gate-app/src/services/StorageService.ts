@@ -68,21 +68,37 @@ export class StorageService {
 
   static async getToken(): Promise<string | null> {
     try {
-      const useKeychain = await checkKeychainAvailability();
+      // Add timeout to prevent hanging on Keychain check
+      const keychainCheckPromise = checkKeychainAvailability();
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          resolve(false);
+        }, 2000); // 2 second timeout
+      });
+      
+      const useKeychain = await Promise.race([keychainCheckPromise, timeoutPromise]);
       let token: string | null = null;
       
       if (useKeychain) {
         try {
-          const credentials = await Keychain.getGenericPassword({
+          // Add timeout to Keychain operation to prevent hanging
+          const keychainPromise = Keychain.getGenericPassword({
             service: CREDENTIALS_SERVICE,
           });
+          const keychainTimeout = new Promise<false>((resolve) => {
+            setTimeout(() => {
+              resolve(false);
+            }, 2000); // 2 second timeout
+          });
           
-          if (credentials) {
+          const credentials = await Promise.race([keychainPromise, keychainTimeout]) as { username: string; password: string } | false | null;
+          
+          if (credentials && credentials !== false && typeof credentials === 'object' && 'password' in credentials) {
             token = credentials.password;
           }
         } catch (keychainError) {
           // Keychain failed, fallback to AsyncStorage
-          console.warn('Keychain get failed, using AsyncStorage:', keychainError);
+          console.warn('[StorageService] Keychain get failed, using AsyncStorage:', keychainError);
         }
       }
       
@@ -92,15 +108,17 @@ export class StorageService {
       }
       
       // Check if token is valid (not expired)
-      if (token && !this.isTokenValid(token)) {
-        console.warn('Token is expired, clearing it');
-        await this.clearToken();
-        return null;
+      if (token) {
+        if (!this.isTokenValid(token)) {
+          console.warn('[StorageService] Token is expired, clearing it');
+          await this.clearToken();
+          return null;
+        }
       }
       
       return token;
     } catch (error) {
-      console.error('Error getting token:', error);
+      console.error('[StorageService] Error getting token:', error);
       return null;
     }
   }
@@ -183,7 +201,6 @@ export class StorageService {
         await AsyncStorage.removeItem(TOKEN_KEY);
       }
       
-      console.log('Token cleared successfully');
     } catch (error) {
       console.error('Error clearing token:', error);
       // Force clear even if error

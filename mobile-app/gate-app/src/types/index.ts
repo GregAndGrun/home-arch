@@ -15,6 +15,8 @@ export enum DeviceType {
 export enum GateType {
   ENTRANCE = 'entrance',
   GARAGE = 'garage',
+  TERRACE_FIX = 'terrace-fix',
+  TERRACE_DOOR = 'terrace-door',
 }
 
 export enum GateState {
@@ -26,17 +28,6 @@ export enum GateState {
 }
 
 export type DeviceCategory = 'gates' | 'lights' | 'temperature' | 'devices';
-
-export interface GateStatus {
-  state: GateState;
-  hasSensor: boolean;
-  lastAction: number;
-}
-
-export interface GatesStatusResponse {
-  entrance: GateStatus;
-  garage: GateStatus;
-}
 
 export interface LoginRequest {
   username: string;

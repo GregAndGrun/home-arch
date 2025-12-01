@@ -11,7 +11,6 @@ import {
 import Icon from '../components/Icon';
 import SplitScreen from '../components/Layout/SplitScreen';
 import { SmartDevice, DeviceType, DeviceCategory, CategoryType } from '../types';
-import ApiService from '../services/ApiService';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -55,26 +54,6 @@ const getAllDevices = async (): Promise<SmartDevice[]> => {
     },
   ];
 
-  try {
-    const gatesStatus = await ApiService.getGatesStatus();
-    // Update gates with real status
-    gates[0].status = {
-      online: true,
-      lastSeen: Date.now(),
-      entrance: gatesStatus.entrance,
-      garage: gatesStatus.garage,
-    };
-    gates[1].status = {
-      online: true,
-      lastSeen: Date.now(),
-      entrance: gatesStatus.entrance,
-      garage: gatesStatus.garage,
-    };
-  } catch (error) {
-    // API failed, but gates are still available with offline status
-    console.warn('Could not fetch gates status, using offline mode');
-  }
-  
   return [
     // GATES (always included)
     ...gates,
@@ -132,7 +111,7 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
 
   const getCategoryName = (): string => {
     const names: Record<DeviceCategory, string> = {
-      'gates': 'Zamki',
+      'gates': 'Bramy/Rolety',
       'lights': 'Oświetlenie',
       'temperature': 'Temperatura',
       'devices': 'Urządzenia',

@@ -14,12 +14,16 @@
 
 // Global objects
 AsyncWebServer server(HTTP_PORT);
+#if ENABLE_GATE1
 GateController gate1(GATE1_RELAY_PIN, GATE1_SENSOR_PIN, "entrance");
+#endif
+#if ENABLE_GATE2
 GateController gate2(GATE2_RELAY_PIN, GATE2_SENSOR_PIN, "garage");
+#endif
 Authentication auth;
 
 // Function declarations
-void setupWiFi();
+void setupWiFi(bool restartOnFailure = true);
 void setupMDNS();
 void setupNTP();
 void setupOTA();
@@ -28,15 +32,27 @@ void printSystemInfo();
 void setup() {
   // CRITICAL: Set relay pins to SAFE state FIRST (before anything else)
   // This prevents relay from being active during boot/reset
+  // Only initialize pins for enabled gates
+  #if ENABLE_GATE1
   pinMode(GATE1_RELAY_PIN, OUTPUT);
-  pinMode(GATE2_RELAY_PIN, OUTPUT);
   if (RELAY_ACTIVE_LOW) {
     digitalWrite(GATE1_RELAY_PIN, HIGH); // OFF for active-low
-    digitalWrite(GATE2_RELAY_PIN, HIGH);  // OFF for active-low
   } else {
     digitalWrite(GATE1_RELAY_PIN, LOW);   // OFF for active-high
+  }
+  #endif
+  
+  #if ENABLE_GATE2
+  pinMode(GATE2_RELAY_PIN, OUTPUT);
+  if (RELAY_ACTIVE_LOW) {
+    digitalWrite(GATE2_RELAY_PIN, HIGH);  // OFF for active-low
+  } else {
     digitalWrite(GATE2_RELAY_PIN, LOW);  // OFF for active-high
   }
+  #endif
+  
+  // Small delay to ensure relays are stable before continuing
+  delay(50);
   
   // Initialize serial communication
   #if ENABLE_SERIAL_LOG
@@ -52,8 +68,12 @@ void setup() {
   digitalWrite(STATUS_LED_PIN, LOW);
 
   // Initialize gate controllers (will set pins again, but safe state is already set)
+  #if ENABLE_GATE1
   gate1.begin();
+  #endif
+  #if ENABLE_GATE2
   gate2.begin();
+  #endif
 
   // Initialize watchdog timer to prevent system hangs
   esp_task_wdt_init(WATCHDOG_TIMEOUT / 1000, true); // Convert ms to seconds
@@ -62,8 +82,8 @@ void setup() {
   // Initialize authentication system
   auth.begin();
 
-  // Connect to WiFi
-  setupWiFi();
+  // Connect to WiFi (restart on failure during initial setup)
+  setupWiFi(true);
 
   // Setup NTP time synchronization
   setupNTP();
@@ -74,7 +94,14 @@ void setup() {
   }
 
   // Initialize web server
-  setupWebServer(server, gate1, gate2, auth);
+  setupWebServer(server,
+    #if ENABLE_GATE1
+    gate1,
+    #endif
+    #if ENABLE_GATE2
+    gate2,
+    #endif
+    auth);
 
   // Start server
   server.begin();
@@ -104,8 +131,12 @@ void loop() {
   ArduinoOTA.handle();
   
   // Update gate controllers (check sensors, auto-close, etc.)
+  #if ENABLE_GATE1
   gate1.update();
+  #endif
+  #if ENABLE_GATE2
   gate2.update();
+  #endif
 
   // Update authentication (cleanup expired tokens, rate limiting)
   auth.update();
@@ -120,15 +151,23 @@ void loop() {
       
       // CRITICAL: Ensure relays are OFF before reconnecting WiFi
       // This prevents accidental gate activation during WiFi issues
+      #if ENABLE_GATE1
       if (RELAY_ACTIVE_LOW) {
         digitalWrite(GATE1_RELAY_PIN, HIGH);
-        digitalWrite(GATE2_RELAY_PIN, HIGH);
       } else {
         digitalWrite(GATE1_RELAY_PIN, LOW);
+      }
+      #endif
+      #if ENABLE_GATE2
+      if (RELAY_ACTIVE_LOW) {
+        digitalWrite(GATE2_RELAY_PIN, HIGH);
+      } else {
         digitalWrite(GATE2_RELAY_PIN, LOW);
       }
+      #endif
       
-      setupWiFi();
+      // Try to reconnect WiFi (don't restart on failure - let loop() retry)
+      setupWiFi(false);
     }
     lastWiFiCheck = millis();
   }
@@ -143,7 +182,7 @@ void loop() {
   delay(10); // Small delay to prevent watchdog issues
 }
 
-void setupWiFi() {
+void setupWiFi(bool restartOnFailure) {
   Serial.print("Connecting to WiFi: ");
   Serial.println(WIFI_SSID);
 
@@ -155,6 +194,11 @@ void setupWiFi() {
          millis() - startAttempt < WIFI_CONNECT_TIMEOUT) {
     delay(500);
     Serial.print(".");
+    
+    // CRITICAL: Reset watchdog during WiFi connection
+    // WiFi connection can take up to 20 seconds, but watchdog is 30 seconds
+    // This prevents watchdog from restarting ESP32 during WiFi connection
+    esp_task_wdt_reset();
   }
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -166,21 +210,34 @@ void setupWiFi() {
     Serial.println(" dBm");
   } else {
     Serial.println("\nWiFi connection failed!");
-    Serial.println("Ensuring relays are OFF before restart...");
     
-    // CRITICAL: Turn off relays before restart
+    // CRITICAL: Ensure relays are OFF before any action
+    #if ENABLE_GATE1
     if (RELAY_ACTIVE_LOW) {
       digitalWrite(GATE1_RELAY_PIN, HIGH);
-      digitalWrite(GATE2_RELAY_PIN, HIGH);
     } else {
       digitalWrite(GATE1_RELAY_PIN, LOW);
+    }
+    #endif
+    #if ENABLE_GATE2
+    if (RELAY_ACTIVE_LOW) {
+      digitalWrite(GATE2_RELAY_PIN, HIGH);
+    } else {
       digitalWrite(GATE2_RELAY_PIN, LOW);
     }
+    #endif
     delay(100); // Give time for relays to deactivate
     
-    Serial.println("Restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
+    if (restartOnFailure) {
+      // Only restart during initial setup (not during reconnection attempts)
+      Serial.println("Ensuring relays are OFF before restart...");
+      Serial.println("Restarting in 5 seconds...");
+      delay(5000);
+      ESP.restart();
+    } else {
+      // Don't restart - let loop() retry later
+      Serial.println("Will retry WiFi connection in next loop iteration...");
+    }
   }
 }
 
@@ -201,6 +258,10 @@ void setupNTP() {
     time(&now);
     localtime_r(&now, &timeinfo);
     attempts++;
+    
+    // Reset watchdog during NTP sync
+    esp_task_wdt_reset();
+    
     #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 3
     Serial.print(".");
     #endif
@@ -252,13 +313,20 @@ void setupOTA() {
     }
     
     // CRITICAL: Turn off relays before OTA update
+    #if ENABLE_GATE1
     if (RELAY_ACTIVE_LOW) {
       digitalWrite(GATE1_RELAY_PIN, HIGH);
-      digitalWrite(GATE2_RELAY_PIN, HIGH);
     } else {
       digitalWrite(GATE1_RELAY_PIN, LOW);
+    }
+    #endif
+    #if ENABLE_GATE2
+    if (RELAY_ACTIVE_LOW) {
+      digitalWrite(GATE2_RELAY_PIN, HIGH);
+    } else {
       digitalWrite(GATE2_RELAY_PIN, LOW);
     }
+    #endif
     
     #if ENABLE_SERIAL_LOG
     Serial.println("OTA Start: " + type);

@@ -210,23 +210,6 @@ int Authentication::getActiveTokenCount() {
   return validTokens.size();
 }
 
-String Authentication::generateToken() {
-  // This method is now deprecated - use JWTUtils::generateJWT() directly
-  // Kept for backward compatibility but should not be called
-  unsigned long expirationTime = currentTimestamp() + JWT_EXPIRATION_TIME;
-  return JWTUtils::generateJWT(expirationTime);
-}
-
-String Authentication::hashPassword(String password) {
-  // Simple hash for demonstration - in production, use proper crypto library
-  // This is just a placeholder
-  unsigned long hash = 0;
-  for (int i = 0; i < password.length(); i++) {
-    hash = ((hash << 5) + hash) + password.charAt(i);
-  }
-  return String(hash, HEX);
-}
-
 unsigned long Authentication::currentTimestamp() {
   // Returns current Unix timestamp in seconds
   time_t now;

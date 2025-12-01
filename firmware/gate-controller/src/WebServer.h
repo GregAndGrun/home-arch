@@ -13,14 +13,19 @@
   #define HTTP_ANY     0b01111111
 #endif
 
+#include "config.h"
 #include <ESPAsyncWebServer.h>
 #include "GateController.h"
 #include "Authentication.h"
 
 // Setup web server with all routes
 void setupWebServer(AsyncWebServer& server, 
-                   GateController& gate1, 
+                   #if ENABLE_GATE1
+                   GateController& gate1,
+                   #endif
+                   #if ENABLE_GATE2
                    GateController& gate2,
+                   #endif
                    Authentication& auth);
 
 // Helper functions

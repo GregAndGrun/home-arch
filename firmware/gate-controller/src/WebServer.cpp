@@ -3,8 +3,12 @@
 #include "config.h"
 
 void setupWebServer(AsyncWebServer& server, 
-                   GateController& gate1, 
+                   #if ENABLE_GATE1
+                   GateController& gate1,
+                   #endif
+                   #if ENABLE_GATE2
                    GateController& gate2,
+                   #endif
                    Authentication& auth) {
   
   // CORS headers for all responses
@@ -31,6 +35,7 @@ void setupWebServer(AsyncWebServer& server,
   server.on("/api/gates/status", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
   });
+  #if ENABLE_GATE1
   server.on("/api/gates/entrance/trigger", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
   });
@@ -40,6 +45,8 @@ void setupWebServer(AsyncWebServer& server,
   server.on("/api/gates/entrance/close", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
   });
+  #endif
+  #if ENABLE_GATE2
   server.on("/api/gates/garage/trigger", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
   });
@@ -49,6 +56,7 @@ void setupWebServer(AsyncWebServer& server,
   server.on("/api/gates/garage/close", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
   });
+  #endif
   
   // Root endpoint - API info
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -123,7 +131,14 @@ void setupWebServer(AsyncWebServer& server,
   });
   
   // Gate status endpoint
-  server.on("/api/gates/status", HTTP_GET, [&auth, &gate1, &gate2](AsyncWebServerRequest *request) {
+  server.on("/api/gates/status", HTTP_GET, [&auth
+    #if ENABLE_GATE1
+    , &gate1
+    #endif
+    #if ENABLE_GATE2
+    , &gate2
+    #endif
+    ](AsyncWebServerRequest *request) {
     if (!authorizeRequest(request, auth)) {
       request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
       return;
@@ -131,15 +146,19 @@ void setupWebServer(AsyncWebServer& server,
     
     StaticJsonDocument<400> doc;
     
+    #if ENABLE_GATE1
     JsonObject g1 = doc.createNestedObject("entrance");
     g1["state"] = gate1.getStateString();
     g1["hasSensor"] = gate1.hasSensor();
     g1["lastAction"] = gate1.getLastActionTime();
+    #endif
     
+    #if ENABLE_GATE2
     JsonObject g2 = doc.createNestedObject("garage");
     g2["state"] = gate2.getStateString();
     g2["hasSensor"] = gate2.hasSensor();
     g2["lastAction"] = gate2.getLastActionTime();
+    #endif
     
     String response;
     serializeJson(doc, response);
@@ -147,6 +166,7 @@ void setupWebServer(AsyncWebServer& server,
   });
   
   // Trigger gate 1 (entrance)
+  #if ENABLE_GATE1
   server.on("/api/gates/entrance/trigger", HTTP_POST, [&auth, &gate1](AsyncWebServerRequest *request) {
     if (!authorizeRequest(request, auth)) {
       request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
@@ -165,8 +185,10 @@ void setupWebServer(AsyncWebServer& server,
     serializeJson(doc, response);
     request->send(200, "application/json", response);
   });
+  #endif
   
   // Trigger gate 2 (garage)
+  #if ENABLE_GATE2
   server.on("/api/gates/garage/trigger", HTTP_POST, [&auth, &gate2](AsyncWebServerRequest *request) {
     if (!authorizeRequest(request, auth)) {
       request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
@@ -185,8 +207,10 @@ void setupWebServer(AsyncWebServer& server,
     serializeJson(doc, response);
     request->send(200, "application/json", response);
   });
+  #endif
   
   // Open gate 1
+  #if ENABLE_GATE1
   server.on("/api/gates/entrance/open", HTTP_POST, [&auth, &gate1](AsyncWebServerRequest *request) {
     if (!authorizeRequest(request, auth)) {
       request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
@@ -196,8 +220,10 @@ void setupWebServer(AsyncWebServer& server,
     gate1.open();
     request->send(200, "application/json", "{\"success\":true,\"action\":\"open\"}");
   });
+  #endif
   
   // Open gate 2
+  #if ENABLE_GATE2
   server.on("/api/gates/garage/open", HTTP_POST, [&auth, &gate2](AsyncWebServerRequest *request) {
     if (!authorizeRequest(request, auth)) {
       request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
@@ -207,8 +233,10 @@ void setupWebServer(AsyncWebServer& server,
     gate2.open();
     request->send(200, "application/json", "{\"success\":true,\"action\":\"open\"}");
   });
+  #endif
   
   // Close gate 1
+  #if ENABLE_GATE1
   server.on("/api/gates/entrance/close", HTTP_POST, [&auth, &gate1](AsyncWebServerRequest *request) {
     if (!authorizeRequest(request, auth)) {
       request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
@@ -218,8 +246,10 @@ void setupWebServer(AsyncWebServer& server,
     gate1.close();
     request->send(200, "application/json", "{\"success\":true,\"action\":\"close\"}");
   });
+  #endif
   
   // Close gate 2
+  #if ENABLE_GATE2
   server.on("/api/gates/garage/close", HTTP_POST, [&auth, &gate2](AsyncWebServerRequest *request) {
     if (!authorizeRequest(request, auth)) {
       request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
@@ -229,6 +259,7 @@ void setupWebServer(AsyncWebServer& server,
     gate2.close();
     request->send(200, "application/json", "{\"success\":true,\"action\":\"close\"}");
   });
+  #endif
   
   // 404 handler
   server.onNotFound([](AsyncWebServerRequest *request) {

@@ -27,50 +27,41 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   onBack,
 }) => {
   const { colors } = useTheme();
-  const [gateState, setGateState] = useState<GateState>(GateState.UNKNOWN);
+  const [gateState] = useState<GateState>(GateState.UNKNOWN);
   const [refreshing, setRefreshing] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
 
-  const gateName =
-    gateType === GateType.GARAGE ? 'Garaż' : 'Brama Wjazdowa';
+  const getGateName = (): string => {
+    switch (gateType) {
+      case GateType.GARAGE:
+        return 'Garaż';
+      case GateType.ENTRANCE:
+        return 'Brama Wjazdowa';
+      case GateType.TERRACE_FIX:
+        return 'Roleta taras (fix)';
+      case GateType.TERRACE_DOOR:
+        return 'Roleta taras (drzwi)';
+      default:
+        return 'Brama';
+    }
+  };
+
+  const gateName = getGateName();
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       setIsConnected(state.isConnected ?? false);
     });
 
-    loadGateStatus();
-
-    const interval = setInterval(() => {
-      loadGateStatus(true);
-    }, 3000);
-
     return () => {
       unsubscribe();
-      clearInterval(interval);
     };
   }, [gateType]);
 
-  const loadGateStatus = async (silent: boolean = false) => {
-    try {
-      const status = await ApiService.getGatesStatus();
-      setGateState(
-        gateType === GateType.GARAGE ? status.garage.state : status.entrance.state
-      );
-    } catch (error: any) {
-      console.error('Error loading gate status:', error);
-      if (!silent) {
-        setGateState(GateState.UNKNOWN);
-      }
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   const handleRefresh = () => {
-    setRefreshing(true);
-    loadGateStatus();
+    // Brama nie ma czujnika stanu – odświeżenie niczego nie zmienia
+    setRefreshing(false);
   };
 
   const handleTrigger = async () => {
@@ -82,7 +73,6 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     setTriggering(true);
     try {
       await ApiService.triggerGate(gateType);
-      setTimeout(() => loadGateStatus(true), 500);
     } catch (error: any) {
       Alert.alert('Błąd', error.message || 'Nie udało się sterować bramą');
     } finally {
@@ -146,7 +136,15 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
             onToggle={handleTrigger}
             loading={triggering}
             disabled={!isConnected}
-            gateType={gateType === GateType.GARAGE ? 'garage' : 'entrance'}
+            gateType={
+              gateType === GateType.GARAGE
+                ? 'garage'
+                : gateType === GateType.TERRACE_FIX
+                ? 'terrace-fix'
+                : gateType === GateType.TERRACE_DOOR
+                ? 'terrace-door'
+                : 'entrance'
+            }
           />
         </View>
 

@@ -4,6 +4,7 @@ import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { StorageService } from '../services/StorageService';
 import ThemeToggle from '../components/ThemeToggle';
+import ColorPicker from '../components/ColorPicker';
 import SplitScreen from '../components/Layout/SplitScreen';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -12,7 +13,7 @@ interface SettingsScreenProps {
 }
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
-  const { colors } = useTheme();
+  const { colors, accentColor, setAccentColor } = useTheme();
   const [username, setUsername] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
@@ -77,6 +78,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
           <View style={styles.row}>
             <Text style={[styles.label, { color: colors.textPrimary }]}>Motyw aplikacji</Text>
             <ThemeToggle />
+          </View>
+          <View style={styles.colorPickerSection}>
+            <Text style={[styles.label, { color: colors.textPrimary, marginBottom: 12 }]}>Kolor akcentu</Text>
+            <ColorPicker selectedColor={accentColor} onColorSelect={setAccentColor} />
           </View>
         </View>
 
@@ -146,6 +151,9 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 16,
+  },
+  colorPickerSection: {
+    marginTop: 16,
   },
 });
 

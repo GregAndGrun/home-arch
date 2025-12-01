@@ -67,7 +67,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onDevicePress, onCategoryPress,
   const availableCategories = roomCategories[selectedCategory] || roomCategories['all'];
 
   const categoryCards: { id: DeviceCategory; name: string; icon: keyof typeof MaterialIcons.glyphMap }[] = [
-    { id: 'gates', name: 'Zamki', icon: 'vpn-key' },
+    { id: 'gates', name: 'Bramy/Rolety', icon: 'blinds' },
     { id: 'lights', name: 'Oświetlenie', icon: 'lightbulb' },
     { id: 'temperature', name: 'Temperatura', icon: 'thermostat' },
     { id: 'devices', name: 'Urządzenia', icon: 'devices' },

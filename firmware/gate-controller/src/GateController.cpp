@@ -24,6 +24,9 @@ void GateController::begin() {
     digitalWrite(relayPin, LOW);  // OFF state for active-high relay
   }
   
+  // Small delay to ensure relay stabilizes in OFF state
+  delay(10);
+  
   // Setup sensor pin if enabled
   if (sensorEnabled) {
     pinMode(sensorPin, INPUT_PULLUP);

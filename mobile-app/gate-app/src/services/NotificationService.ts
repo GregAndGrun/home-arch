@@ -147,7 +147,6 @@ class NotificationService {
     const vpnNotification = this.parseVpnStatus(notification);
     
     if (vpnNotification) {
-      console.log('WireGuard VPN notification detected:', vpnNotification);
       this.notifyListeners(vpnNotification);
     }
   }

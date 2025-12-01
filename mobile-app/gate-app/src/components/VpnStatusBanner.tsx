@@ -44,30 +44,80 @@ const VpnStatusBanner: React.FC<Props> = ({ status, message, onRetry }) => {
     setIsOpeningVpn(true);
     
     try {
-      // Try to open WireGuard app with deep link
+      // Try to open WireGuard app with deep link directly
+      // On Android, canOpenURL may return false even if app is installed,
+      // so we try to open directly first
       const wireguardUrl = `wireguard://activate?tunnel=${encodeURIComponent(WIREGUARD_TUNNEL_NAME)}`;
       
-      // Check if WireGuard app can handle this URL
-      const canOpen = await Linking.canOpenURL(wireguardUrl);
+      try {
+        // Try to open WireGuard deep link directly
+        await Linking.openURL(wireguardUrl);
+        console.log('[VpnStatusBanner] WireGuard deep link opened');
+        // Give it a moment, then check if it worked
+        // If WireGuard is installed, it should open
+        setTimeout(() => {
+          setIsOpeningVpn(false);
+        }, 500);
+        return; // Exit early, let WireGuard handle it
+      } catch (deepLinkError) {
+        console.log('[VpnStatusBanner] WireGuard deep link failed, trying VPN settings:', deepLinkError);
+      }
       
-      if (canOpen) {
-        // Open WireGuard app and activate tunnel
-        const opened = await Linking.openURL(wireguardUrl);
-        if (!opened) {
-          // If deep link failed, fallback to settings
+      // If deep link failed, try to open VPN settings
+      if (Platform.OS === 'android') {
+        // On Android, try multiple methods to open VPN settings
+        try {
+          // Method 1: Intent URI for VPN settings (most reliable)
+          const vpnIntentUrl = 'intent:#Intent;action=android.settings.VPN_SETTINGS;end';
+          await Linking.openURL(vpnIntentUrl);
+          console.log('[VpnStatusBanner] VPN settings opened via intent URI');
+          return;
+        } catch (intentError) {
+          console.log('[VpnStatusBanner] Intent URI failed, trying alternative method:', intentError);
+          
+          try {
+            // Method 2: Alternative intent format
+            const vpnIntentUrl2 = 'intent://settings/vpn#Intent;scheme=android.settings;action=android.settings.VPN_SETTINGS;end';
+            await Linking.openURL(vpnIntentUrl2);
+            console.log('[VpnStatusBanner] VPN settings opened via alternative intent');
+            return;
+          } catch (intentError2) {
+            console.log('[VpnStatusBanner] Alternative intent failed, trying system settings:', intentError2);
+            
+            try {
+              // Method 3: Open system settings (not app settings)
+              // This opens Android system settings where user can navigate to VPN
+              await Linking.openURL('android.settings.SETTINGS');
+              console.log('[VpnStatusBanner] System settings opened');
+              return;
+            } catch (systemError) {
+              console.warn('[VpnStatusBanner] System settings failed:', systemError);
+            }
+          }
+        }
+        
+        // Final fallback: open app settings (not ideal, but better than nothing)
+        console.log('[VpnStatusBanner] All methods failed, falling back to app settings');
+        await Linking.openSettings();
+      } else {
+        // On iOS, open system settings (not app settings) for VPN
+        try {
+          // On iOS, we can try to open system settings directly
+          await Linking.openURL('App-Prefs:root=General&path=VPN');
+          console.log('[VpnStatusBanner] iOS VPN settings opened');
+        } catch (iosError) {
+          console.log('[VpnStatusBanner] iOS VPN settings failed, opening general settings:', iosError);
+          // Fallback to general settings
           await Linking.openSettings();
         }
-      } else {
-        // WireGuard app not installed or not configured, open system settings
-        await Linking.openSettings();
       }
     } catch (error) {
-      console.warn('Error opening VPN:', error);
-      // Fallback to system settings
+      console.error('[VpnStatusBanner] Error opening VPN:', error);
+      // Final fallback to app settings
       try {
         await Linking.openSettings();
       } catch (settingsError) {
-        console.warn('Cannot open settings:', settingsError);
+        console.warn('[VpnStatusBanner] Cannot open settings:', settingsError);
       }
     } finally {
       setIsOpeningVpn(false);

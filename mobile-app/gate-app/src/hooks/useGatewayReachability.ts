@@ -32,23 +32,31 @@ export const useGatewayReachability = () => {
 
   const performCheck = useCallback(async () => {
     if (isCheckingRef.current) {
+      console.log('[GatewayReachability] Check already in progress, skipping');
       return;
     }
 
+    console.log('[GatewayReachability] Starting gateway check...');
     isCheckingRef.current = true;
     try {
+      console.log('[GatewayReachability] Checking network connection...');
       const connection = netInfoRef.current || (await NetInfo.fetch());
+      console.log('[GatewayReachability] Network connected:', connection?.isConnected);
 
       if (!connection?.isConnected) {
+        console.log('[GatewayReachability] Network offline');
         setOffline();
         setLastChecked(Date.now());
         return;
       }
 
+      console.log('[GatewayReachability] Calling ApiService.checkHealth()...');
       await ApiService.checkHealth();
+      console.log('[GatewayReachability] Gateway is online');
       setStatus('online');
       setMessage(null);
     } catch (error) {
+      console.log('[GatewayReachability] Gateway check failed:', error);
       setStatus('vpn-required');
       if (error instanceof Error && error.message && !error.message.includes('No response')) {
         setMessage(error.message);
@@ -58,6 +66,7 @@ export const useGatewayReachability = () => {
     } finally {
       setLastChecked(Date.now());
       isCheckingRef.current = false;
+      console.log('[GatewayReachability] Check completed');
     }
   }, [setOffline]);
 
@@ -79,13 +88,15 @@ export const useGatewayReachability = () => {
       }
     });
 
-    // Initial fetch
+    // Initial fetch - don't check gateway immediately to avoid blocking app startup
+    // Gateway check will be triggered manually after app loads
     NetInfo.fetch().then((state) => {
       netInfoRef.current = state;
       if (!state.isConnected) {
         setOffline();
       } else {
-        performCheck();
+        // Don't perform check immediately - wait for manual trigger
+        setStatus('checking');
       }
     });
 

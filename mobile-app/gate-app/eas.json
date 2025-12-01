@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 5.2.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      },
+      "env": {
+        "EXPO_USE_COMMUNITY_AUTOLINKING": "0"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+

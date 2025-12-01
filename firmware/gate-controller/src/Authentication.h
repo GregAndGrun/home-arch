@@ -23,8 +23,6 @@ private:
   std::map<String, RateLimitInfo> rateLimits;
   std::map<String, int> failedLoginAttempts;
   
-  String generateToken();
-  String hashPassword(String password);
   unsigned long currentTimestamp();
 
 public:

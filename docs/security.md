@@ -389,7 +389,7 @@ See `firmware/gate-controller/src/CertificateData.h` for certificate storage.
 ```bash
 # Device IPs (semi-sensitive - change if compromised)
 GATE_ENTRANCE_IP=192.168.1.100
-GATE_GARAGE_IP=192.168.1.103
+GATE_GARAGE_IP=192.168.0.103
 
 # API Configuration (non-sensitive)
 API_TIMEOUT=10000

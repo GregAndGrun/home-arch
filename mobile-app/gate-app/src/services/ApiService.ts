@@ -8,7 +8,6 @@ import {
 import {
   LoginRequest,
   LoginResponse,
-  GatesStatusResponse,
   GateActionResponse,
   ApiError,
   GateType,
@@ -105,23 +104,17 @@ class ApiService {
     }
   }
 
-  async getGatesStatus(): Promise<GatesStatusResponse> {
-    try {
-      const response = await this.axiosInstance.get<GatesStatusResponse>(
-        API_ENDPOINTS.GATES_STATUS
-      );
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
   async triggerGate(gateType: GateType): Promise<GateActionResponse> {
     try {
-      const endpoint =
-        gateType === GateType.ENTRANCE
-          ? API_ENDPOINTS.GATE_ENTRANCE_TRIGGER
-          : API_ENDPOINTS.GATE_GARAGE_TRIGGER;
+      let endpoint: string;
+      if (gateType === GateType.ENTRANCE) {
+        endpoint = API_ENDPOINTS.GATE_ENTRANCE_TRIGGER;
+      } else if (gateType === GateType.TERRACE_FIX || gateType === GateType.TERRACE_DOOR) {
+        // For now, rolets use garage endpoint (can be changed later if separate endpoints are added)
+        endpoint = API_ENDPOINTS.GATE_GARAGE_TRIGGER;
+      } else {
+        endpoint = API_ENDPOINTS.GATE_GARAGE_TRIGGER;
+      }
 
       const response = await this.axiosInstance.post<GateActionResponse>(endpoint);
       return response.data;
@@ -160,7 +153,10 @@ class ApiService {
 
   async checkHealth(): Promise<any> {
     try {
-      const response = await this.axiosInstance.get(API_ENDPOINTS.HEALTH);
+      // Use shorter timeout for health check to avoid blocking app startup
+      const response = await this.axiosInstance.get(API_ENDPOINTS.HEALTH, {
+        timeout: 3000, // 3 seconds instead of default 10 seconds
+      });
       return response.data;
     } catch (error) {
       throw this.handleError(error);

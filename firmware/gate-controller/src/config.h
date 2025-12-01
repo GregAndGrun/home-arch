@@ -2,12 +2,14 @@
 #define CONFIG_H
 
 // Hardware Configuration
-// GPIO Pins for Gate 1 (Entrance Gate - Not installed yet)
+// Gate 1 (Entrance Gate) - Currently NOT installed
+#define ENABLE_GATE1 false         // Set to true when entrance gate is installed
 #define GATE1_RELAY_PIN 18        // Przekaźnik sterujący bramą wjazdową
 #define GATE1_SENSOR_PIN 19       // Czujnik stanu bramy (opcjonalny)
 
-// GPIO Pins for Gate 2 (Garage Gate - Currently installed)
-#define GATE2_RELAY_PIN 16        // Przekaźnik sterujący bramą garażową (GPIO16 = RX2)
+// Gate 2 (Garage Gate) - Currently installed and active
+#define ENABLE_GATE2 true         // Garage gate is installed
+#define GATE2_RELAY_PIN 23        // Przekaźnik sterujący bramą garażową (GPIO23 - zwykłe GPIO, bez dziwnych stanów przy starcie)
 #define GATE2_SENSOR_PIN 17       // Czujnik stanu bramy (opcjonalny)
 
 // Status LED
@@ -41,7 +43,7 @@
 #define LOG_LEVEL 3                // 0=NONE, 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG
 
 // System
-#define WATCHDOG_TIMEOUT 8000      // Watchdog timeout in ms
+#define WATCHDOG_TIMEOUT 30000      // Watchdog timeout in ms (30 seconds - increased for WiFi connection)
 
 #endif // CONFIG_H
 

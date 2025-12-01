@@ -126,7 +126,7 @@ npm run android  # lub npm run ios lub npm run web
 2. Uzupełnij adresy IP swoich urządzeń ESP32:
    ```
    GATE_ENTRANCE_IP=192.168.1.100
-   GATE_GARAGE_IP=192.168.1.103
+   GATE_GARAGE_IP=192.168.0.103
    ```
 3. (Opcjonalnie) Ustaw nazwę tunelu WireGuard dla automatycznego włączania VPN:
    ```
