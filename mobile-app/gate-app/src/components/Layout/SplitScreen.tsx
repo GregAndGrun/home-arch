@@ -55,8 +55,8 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     marginTop: -30,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     overflow: 'hidden',
     paddingTop: 20,
   },

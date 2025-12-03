@@ -6,6 +6,7 @@ import { StorageService } from '../services/StorageService';
 import ThemeToggle from '../components/ThemeToggle';
 import ColorPicker from '../components/ColorPicker';
 import SplitScreen from '../components/Layout/SplitScreen';
+import Logo from '../components/Logo';
 import { MaterialIcons } from '@expo/vector-icons';
 
 interface SettingsScreenProps {
@@ -99,6 +100,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <MaterialIcons name="logout" size={24} color={colors.error} />
           </TouchableOpacity>
         </View>
+        
+        <View style={styles.logoContainer}>
+          <Logo size="medium" variant="vertical" />
+        </View>
       </ScrollView>
     </SplitScreen>
   );
@@ -107,10 +112,18 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 const styles = StyleSheet.create({
   content: {
     padding: 16,
+    paddingBottom: 100,
   },
   section: {
-    borderRadius: 16,
+    borderRadius: 0,
     padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginTop: 20,
     marginBottom: 20,
   },
   sectionTitle: {

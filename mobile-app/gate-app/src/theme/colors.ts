@@ -19,7 +19,7 @@ const lightenColor = (hex: string, percent: number): string => {
 };
 
 // Default accent color
-export const DEFAULT_ACCENT_COLOR = '#FF6B35';
+export const DEFAULT_ACCENT_COLOR = '#FF5722';
 
 // Generate colors with custom accent color
 export const generateColors = (accentColor: string = DEFAULT_ACCENT_COLOR, isDark: boolean = true) => {

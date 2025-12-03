@@ -2,7 +2,7 @@
 require('dotenv').config({ path: '.env' });
 
 module.exports = {
-  expo: {
+    expo: {
     name: 'Smart Home',
     slug: 'smart-home',
     version: '1.0.0',
@@ -10,6 +10,12 @@ module.exports = {
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     newArchEnabled: true,
+    scheme: 'smarthome',
+    extra: {
+      eas: {
+        projectId: '45c2c77b-51c8-4c87-b7f2-7d9b772be609',
+      },
+    },
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
@@ -37,6 +43,10 @@ module.exports = {
         'android.permission.VIBRATE',
       ],
     },
+    // Disable dev menu in production builds
+    developmentClient: {
+      silentLaunch: true,
+    },
     plugins: [
       [
         'expo-notifications',
@@ -54,15 +64,13 @@ module.exports = {
       // Expose environment variables to the app via expo-constants
       gateEntranceIp: process.env.GATE_ENTRANCE_IP || '192.168.1.100',
       gateGarageIp: process.env.GATE_GARAGE_IP || '192.168.0.103',
+      gateGaragePort: process.env.GATE_GARAGE_PORT || '80',
+      gateEntrancePort: process.env.GATE_ENTRANCE_PORT || '80',
       apiTimeout: parseInt(process.env.API_TIMEOUT || '10000', 10),
       apiRetryAttempts: parseInt(process.env.API_RETRY_ATTEMPTS || '3', 10),
       apiRetryDelay: parseInt(process.env.API_RETRY_DELAY || '1000', 10),
       tokenRefreshThreshold: parseInt(process.env.TOKEN_REFRESH_THRESHOLD || '300', 10),
       wireguardTunnelName: process.env.WIREGUARD_TUNNEL_NAME || 'Home',
-      // EAS project ID (added by eas build:configure)
-      eas: {
-        projectId: '45c2c77b-51c8-4c87-b7f2-7d9b772be609',
-      },
     },
   },
 };

@@ -1,15 +1,14 @@
 #include "Authentication.h"
 #include "JWTUtils.h"
 #include "secrets.h"
+#include "Logger.h"
 #include <Arduino.h>
 
 Authentication::Authentication() {
 }
 
 void Authentication::begin() {
-  #if ENABLE_SERIAL_LOG
-  Serial.println("Authentication system initialized");
-  #endif
+  logInfo("Authentication system initialized");
 }
 
 void Authentication::update() {
@@ -22,26 +21,17 @@ void Authentication::update() {
 }
 
 String Authentication::login(String username, String password, String clientIP) {
-  #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 3
-  Serial.print("Login attempt from: ");
-  Serial.println(clientIP);
-  #endif
+  logInfo("Login attempt from: " + clientIP);
   
   // Check if IP is blocked
   if (isIPBlocked(clientIP)) {
-    #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 2
-    Serial.print("Blocked IP attempted login: ");
-    Serial.println(clientIP);
-    #endif
+    logWarn("Blocked IP attempted login: " + clientIP);
     return "";
   }
   
   // Check rate limit
   if (!checkRateLimit(clientIP)) {
-    #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 2
-    Serial.print("Rate limit exceeded for IP: ");
-    Serial.println(clientIP);
-    #endif
+    logWarn("Rate limit exceeded for IP: " + clientIP);
     return "";
   }
   
@@ -57,9 +47,7 @@ String Authentication::login(String username, String password, String clientIP) 
     // Allow only one active token at a time
     if (!validTokens.empty()) {
       validTokens.clear();
-      #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 3
-      Serial.println("Existing sessions cleared (single-session policy)");
-      #endif
+      logInfo("Existing sessions cleared (single-session policy)");
     }
     
     // Store token info (for tracking, but JWT itself contains expiration)
@@ -70,25 +58,14 @@ String Authentication::login(String username, String password, String clientIP) 
     
     validTokens[token] = info;
     
-    #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 3
-    Serial.print("Login successful for IP: ");
-    Serial.println(clientIP);
-    Serial.print("Token expires at: ");
-    Serial.println(expirationTime);
-    #endif
+    logInfo("Login successful for IP: " + clientIP + ", token expires at: " + String(expirationTime));
     
     return token;
   } else {
     // Increment failed attempts
     failedLoginAttempts[clientIP]++;
     
-    #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 2
-    Serial.print("Login failed for IP: ");
-    Serial.print(clientIP);
-    Serial.print(" (attempt ");
-    Serial.print(failedLoginAttempts[clientIP]);
-    Serial.println(")");
-    #endif
+    logWarn("Login failed for IP: " + clientIP + " (attempt " + String(failedLoginAttempts[clientIP]) + ")");
     
     // Block IP if too many failed attempts
     if (failedLoginAttempts[clientIP] >= MAX_LOGIN_ATTEMPTS) {
@@ -125,10 +102,7 @@ bool Authentication::validateToken(String token) {
 
 void Authentication::logout(String token) {
   validTokens.erase(token);
-  
-  #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 3
-  Serial.println("Token invalidated (logout)");
-  #endif
+  logInfo("Token invalidated (logout)");
 }
 
 bool Authentication::checkRateLimit(String clientIP) {
@@ -170,10 +144,7 @@ bool Authentication::isIPBlocked(String clientIP) {
 }
 
 void Authentication::blockIP(String clientIP) {
-  #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 1
-  Serial.print("IP BLOCKED due to too many failed attempts: ");
-  Serial.println(clientIP);
-  #endif
+  logWarn("IP BLOCKED due to too many failed attempts: " + clientIP);
   
   // In a real implementation, you might want to store blocked IPs
   // in EEPROM/SPIFFS for persistence across reboots
@@ -196,14 +167,10 @@ void Authentication::cleanupExpiredTokens() {
     validTokens.erase(token);
     cleaned++;
   }
-  
-  #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 4
+
   if (cleaned > 0) {
-    Serial.print("Cleaned up ");
-    Serial.print(cleaned);
-    Serial.println(" expired tokens");
+    logInfo("Cleaned up " + String(cleaned) + " expired tokens");
   }
-  #endif
 }
 
 int Authentication::getActiveTokenCount() {

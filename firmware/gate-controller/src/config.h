@@ -26,7 +26,8 @@
 #define MAX_REQUESTS_PER_WINDOW 50 // Max requests per window (increased for auto-refresh)
 
 // Network Configuration
-#define WIFI_CONNECT_TIMEOUT 20000 // WiFi connection timeout in ms
+#define WIFI_CONNECT_TIMEOUT 20000 // WiFi connection timeout in ms (increased to 20s)
+#define WIFI_RECOVER_TIMEOUT 60000 // Time to wait for auto-reconnect before hard reset (60s)
 #define HTTP_PORT 80               // HTTP port (changed from 443 for testing)
 #define ENABLE_MDNS true           // Enable mDNS for local discovery
 

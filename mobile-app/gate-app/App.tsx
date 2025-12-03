@@ -52,15 +52,22 @@ function AppContent() {
 
     checkAuthentication();
     
-    const subscription = AppState.addEventListener('change', async (nextAppState) => {
-      handleAppStateChange(nextAppState);
-      if (nextAppState === 'active') {
+    let appStateSubscription: any = null;
+    
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        setIsLocked(true);
+      } else if (nextAppState === 'active') {
+        // Force re-render when app becomes active to prevent white screen
+        setIsLoading(false);
         await checkAuthentication();
         // Immediately check gateway availability when app returns to foreground
         // This is especially useful after user activates VPN in WireGuard app
         refreshGatewayStatus();
       }
-    });
+    };
+    
+    appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
     
     // Listen for token expiration events
     const handleTokenExpired = async () => {
@@ -73,7 +80,9 @@ function AppContent() {
     
     return () => {
       clearTimeout(safetyTimeout);
-      subscription.remove();
+      if (appStateSubscription) {
+        appStateSubscription.remove();
+      }
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
         window.removeEventListener('token-expired', handleTokenExpired);
       }
@@ -137,11 +146,7 @@ function AppContent() {
     };
   }, [refreshGatewayStatus]);
 
-  const handleAppStateChange = (nextAppState: AppStateStatus) => {
-    if (nextAppState === 'background' || nextAppState === 'inactive') {
-      setIsLocked(true);
-    }
-  };
+  // Removed - moved to useEffect to prevent stale closure issues
 
   const checkAuthentication = async () => {
     // Add timeout to prevent infinite loading
@@ -262,14 +267,6 @@ function AppContent() {
     // Logic for other tabs (stats) can be added here
   };
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
-  }
-
   if (isAuthenticated && isLocked) {
     return (
       <View style={styles.container}>
@@ -341,8 +338,17 @@ function AppContent() {
     }
   };
 
+  // Prevent white screen on app resume by ensuring state is properly initialized
+  if (isLoading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="auto" />
       <VpnStatusBanner
         status={gatewayStatus}

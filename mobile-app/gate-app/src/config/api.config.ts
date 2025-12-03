@@ -8,6 +8,8 @@ const extra = Constants.expoConfig?.extra || {};
 // Default ESP32 IP addresses (loaded from .env or fallback to defaults)
 export const DEFAULT_GATE_ENTRANCE_IP = extra.gateEntranceIp || '192.168.1.100';
 export const DEFAULT_GATE_GARAGE_IP = extra.gateGarageIp || '192.168.0.103';
+export const DEFAULT_GATE_ENTRANCE_PORT = extra.gateEntrancePort || '80';
+export const DEFAULT_GATE_GARAGE_PORT = extra.gateGaragePort || '80';
 
 // API endpoints
 export const API_ENDPOINTS = {

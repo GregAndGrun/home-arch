@@ -1,4 +1,5 @@
 #include "GateController.h"
+#include "Logger.h"
 
 GateController::GateController(uint8_t relay, uint8_t sensor, String name) {
   relayPin = relay;
@@ -32,30 +33,23 @@ void GateController::begin() {
     pinMode(sensorPin, INPUT_PULLUP);
     lastSensorState = readSensor();
   }
-  
-  #if ENABLE_SERIAL_LOG
-  Serial.print("Gate Controller initialized: ");
-  Serial.println(gateName);
-  Serial.print("  Relay Pin: ");
-  Serial.println(relayPin);
+
+  // Log initialization
+  String msg = "Gate Controller initialized: " + gateName +
+               ", relay pin: " + String(relayPin);
   if (sensorEnabled) {
-    Serial.print("  Sensor Pin: ");
-    Serial.println(sensorPin);
+    msg += ", sensor pin: " + String(sensorPin);
   } else {
-    Serial.println("  Sensor: Disabled");
+    msg += ", sensor: disabled";
   }
-  #endif
+  logInfo(msg);
 }
 
 void GateController::update() {
   // SAFETY: Check if relay has been active too long (max 2 seconds)
   // This prevents relay from staying on if code crashes or hangs
   if (relayActive && millis() - relayActivatedTime > 2000) {
-    #if ENABLE_SERIAL_LOG
-    Serial.print("WARNING: Relay for ");
-    Serial.print(gateName);
-    Serial.println(" has been active too long! Forcing OFF.");
-    #endif
+    logWarn("Relay for " + gateName + " has been active too long! Forcing OFF.");
     
     // Force relay OFF
     if (RELAY_ACTIVE_LOW) {
@@ -86,12 +80,7 @@ void GateController::update() {
         }
       }
       
-      #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 3
-      Serial.print("Gate ");
-      Serial.print(gateName);
-      Serial.print(" state changed: ");
-      Serial.println(getStateString());
-      #endif
+      logInfo("Gate " + gateName + " state changed: " + getStateString());
     }
     
     lastSensorReadTime = millis();
@@ -100,10 +89,7 @@ void GateController::update() {
   // Auto-close feature
   if (ENABLE_AUTO_CLOSE && autoCloseArmed && currentState == GATE_OPEN) {
     if (millis() - openTime > AUTO_CLOSE_DELAY) {
-      #if ENABLE_SERIAL_LOG
-      Serial.print("Auto-closing gate: ");
-      Serial.println(gateName);
-      #endif
+      logInfo("Auto-closing gate: " + gateName);
       trigger();
       autoCloseArmed = false;
     }
@@ -111,10 +97,7 @@ void GateController::update() {
 }
 
 void GateController::trigger() {
-  #if ENABLE_SERIAL_LOG && LOG_LEVEL >= 3
-  Serial.print("Triggering gate: ");
-  Serial.println(gateName);
-  #endif
+  logInfo("Triggering gate: " + gateName);
   
   // Activate relay
   if (RELAY_ACTIVE_LOW) {

@@ -9,6 +9,7 @@
 #include "GateController.h"
 #include "WebServer.h"
 #include "Authentication.h"
+#include "Logger.h"
 #include <esp_task_wdt.h>
 #include <time.h>
 
@@ -66,6 +67,11 @@ void setup() {
   // Initialize status LED
   pinMode(STATUS_LED_PIN, OUTPUT);
   digitalWrite(STATUS_LED_PIN, LOW);
+
+  logInfo("Booting Smart Gate Controller...");
+
+  // OPTIMIZATION: Disable WiFi power saving to prevent random disconnects
+  WiFi.setSleep(false);
 
   // Initialize gate controllers (will set pins again, but safe state is already set)
   #if ENABLE_GATE1
@@ -143,31 +149,45 @@ void loop() {
 
   // Keep WiFi alive
   static unsigned long lastWiFiCheck = 0;
-  if (millis() - lastWiFiCheck > 5000) { // Check WiFi every 5 seconds
+  static unsigned long wifiDownSince = 0;
+
+  if (millis() - lastWiFiCheck > 1000) { // Check status every second
     if (WiFi.status() != WL_CONNECTED) {
-      #if ENABLE_SERIAL_LOG
-      Serial.println("WiFi disconnected! Ensuring relays are OFF before reconnecting...");
-      #endif
-      
-      // CRITICAL: Ensure relays are OFF before reconnecting WiFi
-      // This prevents accidental gate activation during WiFi issues
-      #if ENABLE_GATE1
-      if (RELAY_ACTIVE_LOW) {
-        digitalWrite(GATE1_RELAY_PIN, HIGH);
-      } else {
-        digitalWrite(GATE1_RELAY_PIN, LOW);
+      // If we just lost connection, record the time
+      if (wifiDownSince == 0) {
+        wifiDownSince = millis();
+        logWarn("WiFi connection lost. Waiting for auto-reconnect...");
+        
+        // CRITICAL: Ensure relays are OFF before reconnecting WiFi
+        // This prevents accidental gate activation during WiFi issues
+        #if ENABLE_GATE1
+        if (RELAY_ACTIVE_LOW) {
+          digitalWrite(GATE1_RELAY_PIN, HIGH);
+        } else {
+          digitalWrite(GATE1_RELAY_PIN, LOW);
+        }
+        #endif
+        #if ENABLE_GATE2
+        if (RELAY_ACTIVE_LOW) {
+          digitalWrite(GATE2_RELAY_PIN, HIGH);
+        } else {
+          digitalWrite(GATE2_RELAY_PIN, LOW);
+        }
+        #endif
       }
-      #endif
-      #if ENABLE_GATE2
-      if (RELAY_ACTIVE_LOW) {
-        digitalWrite(GATE2_RELAY_PIN, HIGH);
-      } else {
-        digitalWrite(GATE2_RELAY_PIN, LOW);
+
+      // If down for too long, force a hard reset
+      if (millis() - wifiDownSince > WIFI_RECOVER_TIMEOUT) {
+        logWarn("WiFi recovery timeout. Performing hard WiFi reset");
+        setupWiFi(false); // Hard reset
+        wifiDownSince = 0; // Reset timer
       }
-      #endif
-      
-      // Try to reconnect WiFi (don't restart on failure - let loop() retry)
-      setupWiFi(false);
+    } else {
+      // We are connected
+      if (wifiDownSince != 0) {
+        logInfo("WiFi reconnected. IP: " + WiFi.localIP().toString());
+        wifiDownSince = 0;
+      }
     }
     lastWiFiCheck = millis();
   }
@@ -183,33 +203,36 @@ void loop() {
 }
 
 void setupWiFi(bool restartOnFailure) {
-  Serial.print("Connecting to WiFi: ");
-  Serial.println(WIFI_SSID);
+  logInfo("Connecting to WiFi: " + String(WIFI_SSID));
 
+  // Hard reset WiFi module before each connection attempt
+  WiFi.disconnect(true, true);   // disconnect and erase old config
+  WiFi.mode(WIFI_OFF);
+  delay(200);
   WiFi.mode(WIFI_STA);
+
+  // OPTIMIZATION: Explicitly enable auto-reconnect and disable sleep
+  WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
+
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   unsigned long startAttempt = millis();
-  while (WiFi.status() != WL_CONNECTED && 
+  while (WiFi.status() != WL_CONNECTED &&
          millis() - startAttempt < WIFI_CONNECT_TIMEOUT) {
     delay(500);
     Serial.print(".");
     
     // CRITICAL: Reset watchdog during WiFi connection
-    // WiFi connection can take up to 20 seconds, but watchdog is 30 seconds
+    // WiFi connection can take some time, but watchdog is 30 seconds
     // This prevents watchdog from restarting ESP32 during WiFi connection
     esp_task_wdt_reset();
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected!");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("Signal strength: ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
+    logInfo("WiFi connected. IP: " + WiFi.localIP().toString() + ", RSSI: " + String(WiFi.RSSI()) + " dBm");
   } else {
-    Serial.println("\nWiFi connection failed!");
+    logWarn("WiFi connection failed");
     
     // CRITICAL: Ensure relays are OFF before any action
     #if ENABLE_GATE1
@@ -230,13 +253,12 @@ void setupWiFi(bool restartOnFailure) {
     
     if (restartOnFailure) {
       // Only restart during initial setup (not during reconnection attempts)
-      Serial.println("Ensuring relays are OFF before restart...");
-      Serial.println("Restarting in 5 seconds...");
+      logWarn("Ensuring relays are OFF before restart... Restarting in 5 seconds");
       delay(5000);
       ESP.restart();
     } else {
       // Don't restart - let loop() retry later
-      Serial.println("Will retry WiFi connection in next loop iteration...");
+      logWarn("WiFi still disconnected, will retry connection in next loop iteration");
     }
   }
 }
@@ -364,20 +386,26 @@ void setupOTA() {
 }
 
 void printSystemInfo() {
+  String info;
+  info.reserve(160);
+  info += "System Info - Chip: ";
+  info += ESP.getChipModel();
+  info += " (rev ";
+  info += String(ESP.getChipRevision());
+  info += "), CPU: ";
+  info += String(ESP.getCpuFreqMHz());
+  info += " MHz, Free heap: ";
+  info += String(ESP.getFreeHeap());
+  info += " bytes, Flash: ";
+  info += String(ESP.getFlashChipSize());
+  info += " bytes";
+
+  logInfo(info);
+
+  #if ENABLE_SERIAL_LOG
   Serial.println("\n=== System Information ===");
-  Serial.print("Chip Model: ");
-  Serial.println(ESP.getChipModel());
-  Serial.print("Chip Revision: ");
-  Serial.println(ESP.getChipRevision());
-  Serial.print("CPU Frequency: ");
-  Serial.print(ESP.getCpuFreqMHz());
-  Serial.println(" MHz");
-  Serial.print("Free Heap: ");
-  Serial.print(ESP.getFreeHeap());
-  Serial.println(" bytes");
-  Serial.print("Flash Size: ");
-  Serial.print(ESP.getFlashChipSize());
-  Serial.println(" bytes");
+  Serial.println(info);
   Serial.println("========================\n");
+  #endif
 }
 

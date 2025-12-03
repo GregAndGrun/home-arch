@@ -4,6 +4,8 @@ import {
   API_TIMEOUT,
   DEFAULT_GATE_ENTRANCE_IP,
   DEFAULT_GATE_GARAGE_IP,
+  DEFAULT_GATE_ENTRANCE_PORT,
+  DEFAULT_GATE_GARAGE_PORT,
 } from '../config/api.config';
 import {
   LoginRequest,
@@ -20,7 +22,7 @@ class ApiService {
 
   constructor() {
     // Use garage gate IP as default (since it's the main/only gate currently installed)
-    this.baseURL = `http://${DEFAULT_GATE_GARAGE_IP}`;
+    this.baseURL = `http://${DEFAULT_GATE_GARAGE_IP}:${DEFAULT_GATE_GARAGE_PORT}`;
     this.axiosInstance = axios.create({
       baseURL: this.baseURL,
       timeout: API_TIMEOUT,
@@ -72,8 +74,9 @@ class ApiService {
     );
   }
 
-  setBaseURL(ipAddress: string) {
-    this.baseURL = `http://${ipAddress}`;
+  setBaseURL(ipAddress: string, port?: string) {
+    const portPart = port ? `:${port}` : '';
+    this.baseURL = `http://${ipAddress}${portPart}`;
     this.axiosInstance.defaults.baseURL = this.baseURL;
   }
 

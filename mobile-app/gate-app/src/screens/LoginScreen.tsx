@@ -9,14 +9,24 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ImageBackground,
 } from 'react-native';
 import ApiService from '../services/ApiService';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
+import Logo from '../components/Logo';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
 }
+
+// Helper function to convert hex color to rgba with opacity
+const hexToRgba = (hex: string, opacity: number): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const { colors } = useTheme();
@@ -44,10 +54,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.content}>
+      <ImageBackground
+        source={{ uri: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80' }}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        {/* Dark overlay for better text readability */}
+        <View style={[styles.overlay, { backgroundColor: 'rgba(0, 0, 0, 0.65)' }]} />
+        
+        <View style={styles.content}>
         <Text style={[styles.title, { color: colors.textPrimary, fontFamily: typography.fontFamily.bold }]}>
           Smart Home
         </Text>
@@ -55,13 +73,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           Control your smart home devices
         </Text>
 
-        <View style={[styles.form, { backgroundColor: colors.card }]}>
+        <View style={[styles.form, { 
+          backgroundColor: 'rgba(30, 30, 30, 0.85)',
+        }]}>
           <TextInput
             style={[
               styles.input,
               {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
+                backgroundColor: 'rgba(18, 18, 18, 0.6)',
                 color: colors.textPrimary,
               },
             ]}
@@ -77,8 +96,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             style={[
               styles.input,
               {
-                backgroundColor: colors.background,
-                borderColor: colors.border,
+                backgroundColor: 'rgba(18, 18, 18, 0.6)',
                 color: colors.textPrimary,
               },
             ]}
@@ -99,11 +117,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             ]}
             onPress={handleLogin}
             disabled={loading}
+            activeOpacity={0.8}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.buttonText}>Login</Text>
+              <Text style={[styles.buttonText, { color: '#000', fontFamily: typography.fontFamily.bold }]}>
+                LOGIN
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -113,7 +134,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             Make sure you're connected to your home network
           </Text>
         </View>
-      </View>
+        
+        <View style={styles.logoContainer}>
+          <Logo size="medium" variant="vertical" />
+        </View>
+        </View>
+      </ImageBackground>
     </KeyboardAvoidingView>
   );
 };
@@ -122,10 +148,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
   content: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 30,
+    zIndex: 1,
+  },
+  logoContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   title: {
     fontSize: 32,
@@ -139,29 +181,43 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   form: {
-    borderRadius: 0, // Kwadratowy design
-    padding: 20,
+    borderRadius: 0,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 0, // Kwadratowy
-    padding: 15,
-    marginBottom: 15,
+    borderRadius: 0,
+    padding: 16,
+    marginBottom: 16,
     fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   button: {
     borderRadius: 0, // Kwadratowy
-    padding: 15,
+    padding: 16,
     alignItems: 'center',
     marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   footer: {
     marginTop: 30,
