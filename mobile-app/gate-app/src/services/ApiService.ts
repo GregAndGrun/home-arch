@@ -15,6 +15,7 @@ import {
   GateType,
 } from '../types';
 import { StorageService } from './StorageService';
+import ActivityService from './ActivityService';
 
 class ApiService {
   private axiosInstance: AxiosInstance;
@@ -110,16 +111,32 @@ class ApiService {
   async triggerGate(gateType: GateType): Promise<GateActionResponse> {
     try {
       let endpoint: string;
+      let gateName: string;
+      
       if (gateType === GateType.ENTRANCE) {
         endpoint = API_ENDPOINTS.GATE_ENTRANCE_TRIGGER;
-      } else if (gateType === GateType.TERRACE_FIX || gateType === GateType.TERRACE_DOOR) {
-        // For now, rolets use garage endpoint (can be changed later if separate endpoints are added)
+        gateName = 'Brama Wjazdowa';
+      } else if (gateType === GateType.TERRACE_FIX) {
         endpoint = API_ENDPOINTS.GATE_GARAGE_TRIGGER;
+        gateName = 'Roleta taras (fix)';
+      } else if (gateType === GateType.TERRACE_DOOR) {
+        endpoint = API_ENDPOINTS.GATE_GARAGE_TRIGGER;
+        gateName = 'Roleta taras (drzwi)';
       } else {
         endpoint = API_ENDPOINTS.GATE_GARAGE_TRIGGER;
+        gateName = 'Brama Garażowa';
       }
 
       const response = await this.axiosInstance.post<GateActionResponse>(endpoint);
+      
+      // Record activity
+      await ActivityService.recordActivity(
+        `gate-${gateType}`,
+        gateName,
+        'gate',
+        'triggered'
+      ).catch(err => console.error('[ApiService] Failed to record activity:', err));
+      
       return response.data;
     } catch (error) {
       throw this.handleError(error);
@@ -133,7 +150,18 @@ class ApiService {
           ? API_ENDPOINTS.GATE_ENTRANCE_OPEN
           : API_ENDPOINTS.GATE_GARAGE_OPEN;
 
+      const gateName = gateType === GateType.ENTRANCE ? 'Brama Wjazdowa' : 'Brama Garażowa';
+      
       const response = await this.axiosInstance.post<GateActionResponse>(endpoint);
+      
+      // Record activity
+      await ActivityService.recordActivity(
+        `gate-${gateType}`,
+        gateName,
+        'gate',
+        'opened'
+      ).catch(err => console.error('[ApiService] Failed to record activity:', err));
+      
       return response.data;
     } catch (error) {
       throw this.handleError(error);
@@ -147,7 +175,18 @@ class ApiService {
           ? API_ENDPOINTS.GATE_ENTRANCE_CLOSE
           : API_ENDPOINTS.GATE_GARAGE_CLOSE;
 
+      const gateName = gateType === GateType.ENTRANCE ? 'Brama Wjazdowa' : 'Brama Garażowa';
+      
       const response = await this.axiosInstance.post<GateActionResponse>(endpoint);
+      
+      // Record activity
+      await ActivityService.recordActivity(
+        `gate-${gateType}`,
+        gateName,
+        'gate',
+        'closed'
+      ).catch(err => console.error('[ApiService] Failed to record activity:', err));
+      
       return response.data;
     } catch (error) {
       throw this.handleError(error);

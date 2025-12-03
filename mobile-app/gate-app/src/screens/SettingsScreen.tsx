@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { StorageService } from '../services/StorageService';
+import ActivityService from '../services/ActivityService';
 import ThemeToggle from '../components/ThemeToggle';
 import ColorPicker from '../components/ColorPicker';
 import SplitScreen from '../components/Layout/SplitScreen';
 import Logo from '../components/Logo';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Alert } from 'react-native';
 
 interface SettingsScreenProps {
   onLogout: () => void;
@@ -32,6 +34,28 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   const handleSaveUsername = async () => {
     await StorageService.saveUsername(username);
     setIsEditing(false);
+  };
+
+  const handleClearActivityData = () => {
+    Alert.alert(
+      'Wyczyść dane aktywności',
+      'Czy na pewno chcesz usunąć wszystkie zapisane dane aktywności urządzeń?',
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Wyczyść',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await ActivityService.clearAllActivities();
+              Alert.alert('Sukces', 'Dane aktywności zostały wyczyszczone');
+            } catch (error) {
+              Alert.alert('Błąd', 'Nie udało się wyczyścić danych aktywności');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -84,6 +108,21 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <Text style={[styles.label, { color: colors.textPrimary, marginBottom: 12 }]}>Kolor akcentu</Text>
             <ColorPicker selectedColor={accentColor} onColorSelect={setAccentColor} />
           </View>
+        </View>
+
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: typography.fontFamily.medium }]}>
+            DANE
+          </Text>
+          <TouchableOpacity
+            style={styles.logoutRow}
+            onPress={handleClearActivityData}
+          >
+            <Text style={[styles.logoutText, { color: colors.textSecondary, fontFamily: typography.fontFamily.medium }]}>
+              Wyczyść dane aktywności
+            </Text>
+            <MaterialIcons name="delete-outline" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>

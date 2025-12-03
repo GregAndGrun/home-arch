@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import { DeviceType, SmartDevice } from '../types';
 import Icon from './Icon';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
+import ActivityService from '../services/ActivityService';
 
 interface DeviceCardProps {
   device: SmartDevice;
@@ -19,6 +20,38 @@ interface DeviceCardProps {
 
 const DeviceCard: React.FC<DeviceCardProps> = ({ device, onPress, hideStatus = false }) => {
   const { colors } = useTheme();
+  const [lastActivity, setLastActivity] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLastActivity = async () => {
+      try {
+        const activity = await ActivityService.getLastActivity(device.id);
+        if (activity) {
+          const timeDiff = Date.now() - activity.timestamp;
+          const minutes = Math.floor(timeDiff / 60000);
+          const hours = Math.floor(minutes / 60);
+          const days = Math.floor(hours / 24);
+
+          let timeString: string;
+          if (days > 0) {
+            timeString = `${days} ${days === 1 ? 'dzień' : 'dni'} temu`;
+          } else if (hours > 0) {
+            timeString = `${hours} ${hours === 1 ? 'godz.' : 'godz.'} temu`;
+          } else if (minutes > 0) {
+            timeString = `${minutes} ${minutes === 1 ? 'min' : 'min'} temu`;
+          } else {
+            timeString = 'Przed chwilą';
+          }
+
+          setLastActivity(timeString);
+        }
+      } catch (error) {
+        console.error('[DeviceCard] Failed to load last activity:', error);
+      }
+    };
+
+    loadLastActivity();
+  }, [device.id]);
 
   return (
     <TouchableOpacity
@@ -41,9 +74,16 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onPress, hideStatus = f
         {device.name}
       </Text>
       {!hideStatus && (
-        <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-          {device.status.online ? 'Online' : 'Offline'}
-        </Text>
+        <>
+          <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+            {device.status.online ? 'Online' : 'Offline'}
+          </Text>
+          {lastActivity && (
+            <Text style={[styles.activityText, { color: colors.textSecondary }]}>
+              Ostatnio: {lastActivity}
+            </Text>
+          )}
+        </>
       )}
     </TouchableOpacity>
   );
@@ -81,6 +121,12 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     textAlign: 'center',
+    marginTop: 4,
+  },
+  activityText: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
   },
 });
 

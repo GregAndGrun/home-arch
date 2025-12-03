@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/useTheme';
 
@@ -12,6 +13,7 @@ interface BottomTabBarProps {
 
 const BottomTabBar: React.FC<BottomTabBarProps> = ({ currentRoute, onNavigate }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const tabs: { route: TabRoute; icon: keyof typeof MaterialIcons.glyphMap }[] = [
     { route: 'home', icon: 'home' },
@@ -20,7 +22,15 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ currentRoute, onNavigate })
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+    <View style={[
+      styles.container, 
+      { 
+        backgroundColor: colors.card, 
+        borderTopColor: colors.border,
+        paddingTop: 12,
+        paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 8) : insets.bottom,
+      }
+    ]}>
       {tabs.map((tab) => {
         const isActive = currentRoute === tab.route;
         return (
@@ -48,8 +58,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ currentRoute, onNavigate })
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: Platform.OS === 'ios' ? 80 : 60,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+    minHeight: Platform.OS === 'ios' ? 60 : 56,
     borderTopWidth: 1,
     elevation: 8,
     shadowColor: '#000',

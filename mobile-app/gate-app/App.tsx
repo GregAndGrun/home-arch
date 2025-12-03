@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus, Platform, Text } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -13,6 +14,7 @@ import BottomTabBar, { TabRoute } from './src/components/Navigation/BottomTabBar
 import VpnStatusBanner from './src/components/VpnStatusBanner';
 import { StorageService } from './src/services/StorageService';
 import NotificationService from './src/services/NotificationService';
+import ActivityService from './src/services/ActivityService';
 import { SmartDevice, GateType, DeviceCategory, CategoryType } from './src/types';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { useGatewayReachability } from './src/hooks/useGatewayReachability';
@@ -49,6 +51,18 @@ function AppContent() {
         setIsLoading(false);
       }
     }, 5000);
+
+    // Initialize ActivityService (database) in background - don't block app
+    ActivityService.initialize()
+      .then(() => {
+        // Clean up old activities (older than 30 days) on startup
+        ActivityService.clearOldActivities(30).catch(err => {
+          console.warn('[App] Failed to clear old activities:', err);
+        });
+      })
+      .catch(err => {
+        console.warn('[App] ActivityService initialization failed (non-critical):', err);
+      });
 
     checkAuthentication();
     
@@ -371,9 +385,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 

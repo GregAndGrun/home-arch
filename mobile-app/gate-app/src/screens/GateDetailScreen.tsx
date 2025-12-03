@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { GateType, GateState } from '../types';
 import ApiService from '../services/ApiService';
+import ActivityService from '../services/ActivityService';
 import NetInfo from '@react-native-community/netinfo';
 import SplitScreen from '../components/Layout/SplitScreen';
 import CircularGateControl from '../components/CircularGateControl';
@@ -31,6 +32,8 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
+  const [todayActivities, setTodayActivities] = useState<number[]>([]);
+  const [hasRealActivities, setHasRealActivities] = useState(false);
 
   const getGateName = (): string => {
     switch (gateType) {
@@ -54,13 +57,57 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       setIsConnected(state.isConnected ?? false);
     });
 
+    loadTodayActivities();
+
     return () => {
       unsubscribe();
     };
   }, [gateType]);
 
-  const handleRefresh = () => {
-    // Brama nie ma czujnika stanu – odświeżenie niczego nie zmienia
+  const loadTodayActivities = async () => {
+    try {
+      const deviceId = `gate-${gateType}`;
+      
+      // Calculate today's date range (using local Polish time)
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      
+      // Get activities for today
+      const activities = await ActivityService.getActivitiesByDateRange(startOfDay.getTime(), endOfDay.getTime());
+      const filteredActivities = activities.filter(activity => activity.deviceId === deviceId);
+      
+      // Group activities by hour (using local Polish time)
+      const hourCounts = new Array(24).fill(0);
+      filteredActivities.forEach(activity => {
+        // Convert timestamp to local date (Polish timezone)
+        const date = new Date(activity.timestamp);
+        // Use local time methods to get hour in Polish timezone
+        const hour = date.getHours(); // This uses device's local timezone
+        hourCounts[hour]++;
+      });
+      
+      // Normalize to 0-100 scale for visualization
+      const maxCount = Math.max(...hourCounts);
+      if (maxCount === 0) {
+        // No activities - show empty bars
+        setTodayActivities(new Array(24).fill(10));
+        setHasRealActivities(false);
+      } else {
+        const normalized = hourCounts.map(count => (count / maxCount) * 50 + 10);
+        setTodayActivities(normalized);
+        setHasRealActivities(true);
+      }
+    } catch (error) {
+      console.error('[GateDetailScreen] Failed to load activities:', error);
+      setTodayActivities(new Array(24).fill(10));
+      setHasRealActivities(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadTodayActivities();
     setRefreshing(false);
   };
 
@@ -73,6 +120,8 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     setTriggering(true);
     try {
       await ApiService.triggerGate(gateType);
+      // Reload activities after successful trigger
+      await loadTodayActivities();
     } catch (error: any) {
       Alert.alert('Błąd', error.message || 'Nie udało się sterować bramą');
     } finally {
@@ -88,39 +137,47 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     </View>
   );
 
-  const GraphPlaceholder = () => (
-    <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
-      <View style={styles.graphHeader}>
-        <Text style={[styles.graphTitle, { color: colors.textPrimary, fontFamily: typography.fontFamily.bold }]}>
-          AKTYWNOŚĆ
-        </Text>
-        <Text style={[styles.graphSubtitle, { color: colors.textSecondary, fontFamily: typography.fontFamily.medium }]}>
-          DZISIAJ
-        </Text>
+  const GraphPlaceholder = () => {
+    return (
+      <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
+        <View style={styles.graphHeader}>
+          <Text style={[styles.graphTitle, { color: colors.textPrimary, fontFamily: typography.fontFamily.bold }]}>
+            AKTYWNOŚĆ
+          </Text>
+          <Text style={[styles.graphSubtitle, { color: colors.textSecondary, fontFamily: typography.fontFamily.medium }]}>
+            DZISIAJ
+          </Text>
+        </View>
+        <View style={styles.graphBars}>
+          {todayActivities.map((height, i) => {
+            // Show accent color if there are real activities and this bar has activity (height > 10)
+            const hasActivity = hasRealActivities && height > 10;
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.graphBar,
+                  {
+                    backgroundColor: hasActivity ? colors.accent : colors.border,
+                    height: height,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
+        <View style={styles.graphLabels}>
+          <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>00:00</Text>
+          <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>04:00</Text>
+          <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>08:00</Text>
+          <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>12:00</Text>
+          <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>16:00</Text>
+          <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>20:00</Text>
+          <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>23:59</Text>
+        </View>
       </View>
-      <View style={styles.graphBars}>
-        {[...Array(24)].map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.graphBar,
-              {
-                backgroundColor: i > 8 && i < 20 ? colors.accent : colors.border,
-                height: Math.random() * 40 + 10,
-              },
-            ]}
-          />
-        ))}
-      </View>
-      <View style={styles.graphLabels}>
-        <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>12h</Text>
-        <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>15h</Text>
-        <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>18h</Text>
-        <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>21h</Text>
-        <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>0h</Text>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SplitScreen title={gateName} headerContent={<HeaderContent />}>
@@ -220,9 +277,13 @@ const styles = StyleSheet.create({
   graphLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 10,
+    paddingHorizontal: 2, // Small padding to align with bars
   },
   graphLabel: {
     fontSize: 10,
+    width: 40, // Fixed width for consistent spacing
+    textAlign: 'center',
   },
   infoCard: {
     borderRadius: 16,
