@@ -18,8 +18,23 @@ const lightenColor = (hex: string, percent: number): string => {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 };
 
+// Helper function to convert hex color to rgba with opacity
+export const hexToRgba = (hex: string, opacity: number): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
+// Generate gradient colors for accent color
+export const generateGradient = (accentColor: string): [string, string] => {
+  const gradientStart = lightenColor(accentColor, 0.35); // Większe rozjaśnienie
+  const gradientEnd = darkenColor(accentColor, 0.3); // Większe przyciemnienie
+  return [gradientStart, gradientEnd];
+};
+
 // Default accent color
-export const DEFAULT_ACCENT_COLOR = '#FF5722';
+export const DEFAULT_ACCENT_COLOR = '#2196F3';
 
 // Generate colors with custom accent color
 export const generateColors = (accentColor: string = DEFAULT_ACCENT_COLOR, isDark: boolean = true) => {

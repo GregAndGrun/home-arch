@@ -1,35 +1,110 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Platform, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/useTheme';
 import { typography } from '../../theme/typography';
+import { generateGradient } from '../../theme/colors';
 
 interface SplitScreenProps {
   title?: string;
+  titleIcon?: keyof typeof MaterialIcons.glyphMap;
   headerContent?: React.ReactNode;
   children: React.ReactNode;
 }
 
-const SplitScreen: React.FC<SplitScreenProps> = ({ title, headerContent, children }) => {
-  const { colors } = useTheme();
+const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerContent, children }) => {
+  const { colors, accentColor } = useTheme();
+  const [gradientStart, gradientEnd] = generateGradient(accentColor);
+  
+  // Dodajemy kolor pośredni dla bardziej płynnego gradientu
+  const gradientColors = [gradientEnd, accentColor, gradientStart];
+
+  // Animacje
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const iconScaleAnim = useRef(new Animated.Value(0)).current;
+  const contentFadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Animacja headera i contentu
+    Animated.parallel([
+      Animated.timing(headerFadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(iconScaleAnim, {
+        toValue: 1,
+        friction: 3,
+        tension: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentFadeAnim, {
+        toValue: 1,
+        duration: 300,
+        delay: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.headerContainer, { backgroundColor: colors.accent }]}>
-        <SafeAreaView>
-          <View style={styles.headerContent}>
+      <View style={styles.headerContainer}>
+        <LinearGradient
+          colors={gradientColors} // Ciemny -> Średni -> Jasny
+          locations={[0, 0.5, 1]} // Pozycje kolorów dla bardziej wyraźnego gradientu
+          start={{ x: 0, y: 1 }} // Lewy dolny róg
+          end={{ x: 1, y: 0 }} // Prawy górny róg
+          style={StyleSheet.absoluteFill}
+        />
+        <SafeAreaView style={styles.safeAreaContent}>
+          <Animated.View 
+            style={[
+              styles.headerContent,
+              { opacity: headerFadeAnim }
+            ]}
+          >
             {title && (
-              <Text style={[styles.headerTitle, { fontFamily: typography.fontFamily.bold }]}>
-                {title}
-              </Text>
+              <View style={styles.titleContainer}>
+                {titleIcon && (
+                  <Animated.View 
+                    style={{ 
+                      marginRight: 12,
+                      opacity: headerFadeAnim,
+                      transform: [{ scale: iconScaleAnim }],
+                    }}
+                  >
+                    <MaterialIcons name={titleIcon} size={32} color="#FFFFFF" />
+                  </Animated.View>
+                )}
+                <Animated.Text 
+                  style={[
+                    styles.headerTitle, 
+                    { 
+                      fontFamily: typography.fontFamily.bold,
+                      opacity: headerFadeAnim,
+                    }
+                  ]}
+                >
+                  {title}
+                </Animated.Text>
+              </View>
             )}
             {headerContent}
-          </View>
+          </Animated.View>
         </SafeAreaView>
       </View>
       
-      <View style={[styles.contentContainer, { backgroundColor: colors.background }]}>
+      <Animated.View
+        style={[
+          styles.contentContainer,
+          { backgroundColor: colors.background },
+          { opacity: contentFadeAnim },
+        ]}
+      >
         {children}
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -40,16 +115,31 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     height: '35%',
+    minHeight: 250,
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 40 : 0,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  safeAreaContent: {
+    position: 'relative',
+    zIndex: 1,
+    height: '100%',
+    justifyContent: 'flex-start',
   },
   headerContent: {
     paddingTop: 20,
+    flex: 1,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     color: '#FFFFFF',
-    marginBottom: 16,
     textAlign: 'center',
   },
   contentContainer: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { GateType, GateState } from '../types';
 import NetInfo from '@react-native-community/netinfo';
@@ -65,7 +66,8 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
     state: GateState;
     onPress: () => void;
     disabled?: boolean;
-  }> = ({ title, gateType, state, onPress, disabled = false }) => {
+    index?: number;
+  }> = ({ title, gateType, state, onPress, disabled = false, index = 0 }) => {
     // Different icons for different gates/rolets
     const getGateIcon = () => {
       switch (gateType) {
@@ -80,44 +82,79 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
           return 'home';
       }
     };
+
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+    const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+    useEffect(() => {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          delay: index * 80,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          delay: index * 80,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 4,
+          tension: 40,
+          delay: index * 80,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, []);
     
     return (
-      <TouchableOpacity
-        style={[
-          styles.gateCard,
-          { backgroundColor: colors.card },
-          disabled && styles.gateCardDisabled,
-        ]}
-        onPress={disabled ? undefined : onPress}
-        activeOpacity={disabled ? 1 : 0.7}
-        disabled={disabled}
+      <Animated.View
+        style={{
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+        }}
       >
-        <View style={styles.gateCardContent}>
-          <View style={styles.gateIconContainer}>
-            <MaterialIcons
-              name={getGateIcon()}
-              size={32}
-              color={disabled ? colors.textSecondary : colors.textPrimary}
-            />
+        <TouchableOpacity
+          style={[
+            styles.gateCard,
+            { backgroundColor: colors.card },
+            disabled && styles.gateCardDisabled,
+          ]}
+          onPress={disabled ? undefined : onPress}
+          activeOpacity={disabled ? 1 : 0.7}
+          disabled={disabled}
+        >
+          <View style={styles.gateCardContent}>
+            <View style={styles.gateIconContainer}>
+              <MaterialIcons
+                name={getGateIcon()}
+                size={32}
+                color={disabled ? colors.textSecondary : colors.textPrimary}
+              />
+            </View>
+            <View style={styles.gateInfo}>
+              <Text
+                style={[
+                  styles.gateTitle,
+                  {
+                    color: disabled ? colors.textSecondary : colors.textPrimary,
+                    fontFamily: typography.fontFamily.semiBold,
+                  },
+                ]}
+              >
+                {title}
+              </Text>
+            </View>
+            {!disabled && (
+              <MaterialIcons name="chevron-right" size={32} color={colors.textSecondary} />
+            )}
           </View>
-          <View style={styles.gateInfo}>
-            <Text
-              style={[
-                styles.gateTitle,
-                {
-                  color: disabled ? colors.textSecondary : colors.textPrimary,
-                  fontFamily: typography.fontFamily.semiBold,
-                },
-              ]}
-            >
-              {title}
-            </Text>
-          </View>
-          {!disabled && (
-            <MaterialIcons name="chevron-right" size={32} color={colors.textSecondary} />
-          )}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -130,7 +167,7 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
   );
 
   return (
-    <SplitScreen title="Bramy" headerContent={<HeaderContent />}>
+    <SplitScreen title="Bramy" titleIcon="blinds" headerContent={<HeaderContent />}>
       {!isConnected && (
         <View style={[styles.offlineBanner, { backgroundColor: colors.warning }]}>
           <Text style={styles.offlineText}>⚠️ Brak połączenia z siecią</Text>
@@ -149,6 +186,7 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
               gateType={GateType.GARAGE}
               state={GateState.UNKNOWN}
               onPress={() => onGatePress(GateType.GARAGE)}
+              index={0}
             />
 
             <GateListItem
@@ -157,6 +195,7 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
               state={GateState.UNKNOWN}
               onPress={() => onGatePress(GateType.ENTRANCE)}
               disabled={true}
+              index={1}
             />
 
             <GateListItem
@@ -165,6 +204,7 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
               state={GateState.UNKNOWN}
               onPress={() => onGatePress(GateType.TERRACE_FIX)}
               disabled={true}
+              index={2}
             />
 
             <GateListItem
@@ -173,6 +213,7 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
               state={GateState.UNKNOWN}
               onPress={() => onGatePress(GateType.TERRACE_DOOR)}
               disabled={true}
+              index={3}
             />
         </>
       </ScrollView>

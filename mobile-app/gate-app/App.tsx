@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus, Platform, Text } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus, Platform, Text, Animated } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import LoginScreen from './src/screens/LoginScreen';
@@ -9,6 +9,7 @@ import GatesScreen from './src/screens/GatesScreen';
 import GateDetailScreen from './src/screens/GateDetailScreen';
 import CategoryDevicesScreen from './src/screens/CategoryDevicesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import StatsScreen from './src/screens/StatsScreen';
 import BiometricLockScreen from './src/screens/BiometricLockScreen';
 import BottomTabBar, { TabRoute } from './src/components/Navigation/BottomTabBar';
 import VpnStatusBanner from './src/components/VpnStatusBanner';
@@ -31,6 +32,9 @@ function AppContent() {
   const [selectedGateType, setSelectedGateType] = useState<GateType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<DeviceCategory | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<CategoryType>('all');
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const [showAnimatedContent, setShowAnimatedContent] = useState(false);
   const { status: gatewayStatus, message: gatewayMessage, refresh: refreshGatewayStatus } =
     useGatewayReachability();
 
@@ -73,11 +77,15 @@ function AppContent() {
         setIsLocked(true);
       } else if (nextAppState === 'active') {
         // Force re-render when app becomes active to prevent white screen
+        // Set loading to false first to ensure UI renders
         setIsLoading(false);
-        await checkAuthentication();
-        // Immediately check gateway availability when app returns to foreground
-        // This is especially useful after user activates VPN in WireGuard app
-        refreshGatewayStatus();
+        // Use setTimeout to ensure state update is processed before async call
+        setTimeout(async () => {
+          await checkAuthentication();
+          // Immediately check gateway availability when app returns to foreground
+          // This is especially useful after user activates VPN in WireGuard app
+          refreshGatewayStatus();
+        }, 100);
       }
     };
     
@@ -209,11 +217,28 @@ function AppContent() {
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
     setIsLocked(false);
+    // Trigger animation
+    setShowAnimatedContent(true);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const handleLogout = async () => {
     setIsAuthenticated(false);
     setIsLocked(true);
+    setShowAnimatedContent(false);
+    fadeAnim.setValue(0);
+    slideAnim.setValue(20);
     try {
       await StorageService.clearToken();
     } catch (error) {
@@ -277,8 +302,9 @@ function AppContent() {
       setCurrentScreen('home');
     } else if (route === 'settings') {
       setCurrentScreen('settings');
+    } else if (route === 'stats') {
+      // Stats screen doesn't need screen state
     }
-    // Logic for other tabs (stats) can be added here
   };
 
   if (isAuthenticated && isLocked) {
@@ -300,6 +326,10 @@ function AppContent() {
       );
     }
 
+    if (currentTab === 'stats') {
+      return <StatsScreen />;
+    }
+
     if (currentTab !== 'home') {
       // Placeholder for other tabs
       return (
@@ -312,11 +342,19 @@ function AppContent() {
     switch (currentScreen) {
       case 'home':
         return (
-          <HomeScreen
-            onDevicePress={handleDevicePress}
-            onCategoryPress={handleCategoryPress}
-            onLogout={handleLogoutFromScreen}
-          />
+          <Animated.View
+            style={{
+              flex: 1,
+              opacity: showAnimatedContent ? fadeAnim : 1,
+              transform: [{ translateY: showAnimatedContent ? slideAnim : 0 }],
+            }}
+          >
+            <HomeScreen
+              onDevicePress={handleDevicePress}
+              onCategoryPress={handleCategoryPress}
+              onLogout={handleLogoutFromScreen}
+            />
+          </Animated.View>
         );
       case 'category-devices':
         return selectedCategory ? (
@@ -371,7 +409,7 @@ function AppContent() {
       />
       {isAuthenticated ? (
         <>
-          <View style={styles.screenContainer}>
+          <View style={styles.screenContainer} key={currentTab}>
             {renderScreen()}
           </View>
           <BottomTabBar currentRoute={currentTab} onNavigate={handleTabNavigate} />

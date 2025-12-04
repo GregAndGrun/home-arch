@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Animated,
 } from 'react-native';
 import { DeviceType, SmartDevice } from '../types';
 import Icon from './Icon';
@@ -21,6 +22,25 @@ interface DeviceCardProps {
 const DeviceCard: React.FC<DeviceCardProps> = ({ device, onPress, hideStatus = false }) => {
   const { colors } = useTheme();
   const [lastActivity, setLastActivity] = useState<string | null>(null);
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Animacja pojawienia się karty
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 4,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   useEffect(() => {
     const loadLastActivity = async () => {
@@ -53,17 +73,43 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onPress, hideStatus = f
     loadLastActivity();
   }, [device.id]);
 
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      friction: 3,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        { backgroundColor: colors.card },
-        !device.enabled && styles.cardDisabled,
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-      disabled={!device.enabled}
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ scale: scaleAnim }],
+      }}
     >
+      <TouchableOpacity
+        style={[
+          styles.card,
+          { backgroundColor: colors.card },
+          !device.enabled && styles.cardDisabled,
+        ]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.7}
+        disabled={!device.enabled}
+      >
       <View style={styles.iconContainer}>
         <Icon type={device.type} size={48} color={colors.textPrimary} />
       </View>
@@ -85,7 +131,8 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ device, onPress, hideStatus = f
           )}
         </>
       )}
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 

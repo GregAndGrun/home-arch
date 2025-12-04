@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Animated,
 } from 'react-native';
 import { GateState } from '../types';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
+import { hexToRgba } from '../theme/colors';
 
 interface GateControlPanelProps {
   gateName: string;
@@ -31,6 +33,23 @@ const GateControlPanel: React.FC<GateControlPanelProps> = ({
   disabled = false,
 }) => {
   const { colors } = useTheme();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const getStateColor = (): string => {
     switch (state) {
@@ -75,8 +94,35 @@ const GateControlPanel: React.FC<GateControlPanelProps> = ({
     }
   };
 
+  const handleButtonPress = (callback: () => void) => {
+    // Animacja kliknięcia
+    const scaleAnim = new Animated.Value(1);
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    callback();
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
+    <Animated.View
+      style={[
+        styles.container,
+        { backgroundColor: colors.card },
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
       <View style={styles.statusContainer}>
         <Text style={styles.statusIcon}>{getStateIcon()}</Text>
         <View style={styles.statusInfo}>
@@ -103,17 +149,17 @@ const GateControlPanel: React.FC<GateControlPanelProps> = ({
         <TouchableOpacity
           style={[
             styles.controlButton,
-            { backgroundColor: colors.accent }, // Pomarańczowy przycisk akcji
+            { backgroundColor: hexToRgba(colors.accent, 0.1) }, // 10% opacity
             (disabled || loading) && styles.buttonDisabled,
           ]}
-          onPress={onTrigger}
+          onPress={() => handleButtonPress(onTrigger)}
           disabled={disabled || loading}
           activeOpacity={0.7}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.accent} />
           ) : (
-            <Text style={styles.primaryButtonText}>
+            <Text style={[styles.primaryButtonText, { color: colors.accent }]}>
               {state === GateState.OPEN || state === GateState.OPENING
                 ? 'Zamknij'
                 : 'Otwórz'}
@@ -130,7 +176,7 @@ const GateControlPanel: React.FC<GateControlPanelProps> = ({
                 (disabled || loading || state === GateState.OPEN) &&
                   styles.buttonDisabled,
               ]}
-              onPress={onOpen}
+              onPress={() => onOpen && handleButtonPress(onOpen)}
               disabled={disabled || loading || state === GateState.OPEN}
               activeOpacity={0.7}
             >
@@ -146,7 +192,7 @@ const GateControlPanel: React.FC<GateControlPanelProps> = ({
                 (disabled || loading || state === GateState.CLOSED) &&
                   styles.buttonDisabled,
               ]}
-              onPress={onClose}
+              onPress={() => onClose && handleButtonPress(onClose)}
               disabled={disabled || loading || state === GateState.CLOSED}
               activeOpacity={0.7}
             >
@@ -157,7 +203,7 @@ const GateControlPanel: React.FC<GateControlPanelProps> = ({
           </View>
         )}
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -206,7 +252,6 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
   },

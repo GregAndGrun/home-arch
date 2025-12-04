@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import Icon from '../components/Icon';
 import SplitScreen from '../components/Layout/SplitScreen';
@@ -59,6 +60,61 @@ const getAllDevices = async (): Promise<SmartDevice[]> => {
     ...gates,
     // Other device types are not available yet
   ];
+};
+
+// Animated device card component
+const AnimatedDeviceCard: React.FC<{
+  device: SmartDevice;
+  index: number;
+  onPress: () => void;
+  colors: any;
+}> = ({ device, index, onPress, colors }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }],
+      }}
+    >
+      <TouchableOpacity
+        style={[styles.deviceListItem, { backgroundColor: colors.card }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <View style={styles.deviceListItemContent}>
+          <View style={styles.deviceIconContainer}>
+            <Icon type={device.type} size={32} color={colors.textPrimary} />
+          </View>
+          <View style={styles.deviceInfo}>
+            <Text style={[styles.deviceName, { color: colors.textPrimary, fontFamily: typography.fontFamily.semiBold }]}>
+              {device.name}
+            </Text>
+          </View>
+          <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
 };
 
 const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
@@ -119,6 +175,16 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
     return names[category];
   };
 
+  const getCategoryIcon = (): keyof typeof MaterialIcons.glyphMap => {
+    const icons: Record<DeviceCategory, keyof typeof MaterialIcons.glyphMap> = {
+      'gates': 'blinds',
+      'lights': 'lightbulb',
+      'temperature': 'thermostat',
+      'devices': 'devices',
+    };
+    return icons[category];
+  };
+
   const getRoomName = (): string => {
     const names: Record<CategoryType, string> = {
       'all': 'Wszystkie',
@@ -140,7 +206,11 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
   );
 
   return (
-    <SplitScreen title={`${getCategoryName()} - ${getRoomName()}`} headerContent={<HeaderContent />}>
+    <SplitScreen 
+      title={getCategoryName()} 
+      titleIcon={getCategoryIcon()}
+      headerContent={<HeaderContent />}
+    >
       <ScrollView
         contentContainerStyle={styles.contentContainer}
         refreshControl={
@@ -163,25 +233,14 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
                 </Text>
               </View>
             ) : (
-              devices.map((device) => (
-                <TouchableOpacity
+              devices.map((device, index) => (
+                <AnimatedDeviceCard
                   key={device.id}
-                  style={[styles.deviceListItem, { backgroundColor: colors.card }]}
+                  device={device}
+                  index={index}
                   onPress={() => onDevicePress(device)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.deviceListItemContent}>
-                    <View style={styles.deviceIconContainer}>
-                      <Icon type={device.type} size={32} color={colors.textPrimary} />
-                    </View>
-                    <View style={styles.deviceInfo}>
-                      <Text style={[styles.deviceName, { color: colors.textPrimary, fontFamily: typography.fontFamily.semiBold }]}>
-                        {device.name}
-                      </Text>
-                    </View>
-                    <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
-                  </View>
-                </TouchableOpacity>
+                  colors={colors}
+                />
               ))
             )}
           </>

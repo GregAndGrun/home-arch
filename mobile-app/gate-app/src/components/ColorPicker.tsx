@@ -1,7 +1,12 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useTheme } from '../theme/useTheme';
+import { typography } from '../theme/typography';
 import { MaterialIcons } from '@expo/vector-icons';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface ColorPickerProps {
   selectedColor: string;
@@ -80,13 +85,42 @@ const ACCENT_COLORS = [
   return hueA - hueB;
 });
 
+const INITIAL_COLORS_COUNT = 6;
+
 const ColorPicker: React.FC<ColorPickerProps> = ({ selectedColor, onColorSelect }) => {
   const { colors } = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  // Zapamiętaj początkową kolejność kolorów (z wybranym na początku) - tylko raz przy montowaniu
+  const sortedColorsRef = useRef<typeof ACCENT_COLORS>(ACCENT_COLORS);
+  const [sortedColors, setSortedColors] = useState<typeof ACCENT_COLORS>(ACCENT_COLORS);
+
+  // Sortuj kolory tylko raz przy montowaniu komponentu
+  useEffect(() => {
+    const selectedIndex = ACCENT_COLORS.findIndex(c => c.value === selectedColor);
+    if (selectedIndex === -1 || selectedIndex === 0) {
+      sortedColorsRef.current = ACCENT_COLORS;
+      setSortedColors(ACCENT_COLORS);
+    } else {
+      const selected = ACCENT_COLORS[selectedIndex];
+      const others = ACCENT_COLORS.filter((_, i) => i !== selectedIndex);
+      const sorted = [selected, ...others];
+      sortedColorsRef.current = sorted;
+      setSortedColors(sorted);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Pusta tablica zależności - uruchamia się tylko raz
+
+  const toggleExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(!expanded);
+  };
+
+  const visibleColors = expanded ? sortedColors : sortedColors.slice(0, INITIAL_COLORS_COUNT);
 
   return (
     <View style={styles.container}>
       <View style={styles.colorGrid}>
-        {ACCENT_COLORS.map((color) => {
+        {visibleColors.map((color) => {
           const isSelected = color.value === selectedColor;
           return (
             <TouchableOpacity
@@ -107,6 +141,22 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ selectedColor, onColorSelect 
           );
         })}
       </View>
+      {ACCENT_COLORS.length > INITIAL_COLORS_COUNT && (
+        <TouchableOpacity
+          style={styles.expandButton}
+          onPress={toggleExpanded}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.expandButtonText, { color: colors.accent, fontFamily: typography.fontFamily.medium }]}>
+            {expanded ? 'Pokaż mniej' : 'Pokaż więcej'}
+          </Text>
+          <MaterialIcons
+            name={expanded ? 'expand-less' : 'expand-more'}
+            size={20}
+            color={colors.accent}
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -143,6 +193,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  expandButtonText: {
+    fontSize: 14,
+    marginRight: 4,
   },
 });
 

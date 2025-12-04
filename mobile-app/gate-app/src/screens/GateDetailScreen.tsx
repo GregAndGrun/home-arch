@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -62,9 +62,9 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     return () => {
       unsubscribe();
     };
-  }, [gateType]);
+  }, [gateType, loadTodayActivities]);
 
-  const loadTodayActivities = async () => {
+  const loadTodayActivities = useCallback(async () => {
     try {
       const deviceId = `gate-${gateType}`;
       
@@ -103,7 +103,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       setTodayActivities(new Array(24).fill(10));
       setHasRealActivities(false);
     }
-  };
+  }, [gateType]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -137,6 +137,26 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     </View>
   );
 
+  // Memoize graph bars to prevent unnecessary re-renders
+  const graphBars = useMemo(() => {
+    return todayActivities.map((height, i) => {
+      // Show accent color if there are real activities and this bar has activity (height > 10)
+      const hasActivity = hasRealActivities && height > 10;
+      return (
+        <View
+          key={i}
+          style={[
+            styles.graphBar,
+            {
+              backgroundColor: hasActivity ? colors.accent : colors.border,
+              height: height,
+            },
+          ]}
+        />
+      );
+    });
+  }, [todayActivities, hasRealActivities, colors.accent, colors.border]);
+
   const GraphPlaceholder = () => {
     return (
       <View style={[styles.graphCard, { backgroundColor: colors.card }]}>
@@ -149,22 +169,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
           </Text>
         </View>
         <View style={styles.graphBars}>
-          {todayActivities.map((height, i) => {
-            // Show accent color if there are real activities and this bar has activity (height > 10)
-            const hasActivity = hasRealActivities && height > 10;
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.graphBar,
-                  {
-                    backgroundColor: hasActivity ? colors.accent : colors.border,
-                    height: height,
-                  },
-                ]}
-              />
-            );
-          })}
+          {graphBars}
         </View>
         <View style={styles.graphLabels}>
           <Text style={[styles.graphLabel, { color: colors.textSecondary }]}>00:00</Text>
@@ -269,10 +274,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     height: 60,
     marginBottom: 10,
+    flexWrap: 'nowrap',
+    width: '100%',
   },
   graphBar: {
     width: 4,
     borderRadius: 2,
+    flexShrink: 0,
   },
   graphLabels: {
     flexDirection: 'row',

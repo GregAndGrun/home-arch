@@ -19,7 +19,7 @@ module.exports = {
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#2196F3',
     },
     ios: {
       bundleIdentifier: 'com.smarthome.app',
@@ -33,7 +33,7 @@ module.exports = {
       package: 'com.smarthome.app',
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#2196F3',
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
@@ -52,7 +52,7 @@ module.exports = {
         'expo-notifications',
         {
           icon: './assets/icon.png',
-          color: '#FF6B35',
+          color: '#2196F3',
           sounds: [],
         },
       ],
