@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.2.0"
+    "version": ">= 5.2.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -12,12 +13,22 @@
     },
     "preview": {
       "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
       "android": {
         "buildType": "apk",
         "image": "latest"
+      },
+      "env": {
+        "EXPO_USE_COMMUNITY_AUTOLINKING": "0"
       }
     },
     "production": {
+      "ios": {
+        "simulator": false
+      },
       "android": {
         "buildType": "apk",
         "image": "latest"

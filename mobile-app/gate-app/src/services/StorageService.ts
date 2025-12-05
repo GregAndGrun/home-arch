@@ -24,17 +24,33 @@ async function checkKeychainAvailability(): Promise<boolean> {
   
   // Try to use Keychain, but fallback to AsyncStorage if it fails
   try {
-    // Test if Keychain is available by checking if the function exists
-    if (typeof Keychain.getGenericPassword === 'function' && Keychain.getGenericPassword !== null) {
-      // Try a test read to see if Keychain actually works
-      await Keychain.getGenericPassword({ service: CREDENTIALS_SERVICE });
-      isKeychainAvailable = true;
-    } else {
+    // Check if Keychain module is properly initialized
+    if (!Keychain || typeof Keychain.getGenericPassword !== 'function') {
+      console.warn('[StorageService] Keychain module not available');
       isKeychainAvailable = false;
+      keychainChecked = true;
+      return false;
     }
+    
+    // Check if the function is not null (native module not linked)
+    if (Keychain.getGenericPassword === null) {
+      console.warn('[StorageService] Keychain native module not linked, using AsyncStorage');
+      isKeychainAvailable = false;
+      keychainChecked = true;
+      return false;
+    }
+    
+    // Try a test read to see if Keychain actually works (with timeout)
+    const testPromise = Keychain.getGenericPassword({ service: CREDENTIALS_SERVICE });
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), 1000);
+    });
+    
+    await Promise.race([testPromise, timeoutPromise]);
+    isKeychainAvailable = true;
   } catch (error) {
-    // Keychain not available (e.g., iOS simulator), use AsyncStorage
-    console.warn('Keychain not available, using AsyncStorage fallback:', error);
+    // Keychain not available (e.g., iOS simulator, Expo Go), use AsyncStorage
+    console.warn('[StorageService] Keychain not available, using AsyncStorage fallback:', error);
     isKeychainAvailable = false;
   }
   
@@ -93,7 +109,7 @@ export class StorageService {
           
           const credentials = await Promise.race([keychainPromise, keychainTimeout]) as { username: string; password: string } | false | null;
           
-          if (credentials && credentials !== false && typeof credentials === 'object' && 'password' in credentials) {
+          if (credentials && typeof credentials === 'object' && 'password' in credentials) {
             token = credentials.password;
           }
         } catch (keychainError) {
@@ -231,35 +247,76 @@ export class StorageService {
   // Credentials management (username/password) - optional for "remember me"
   static async saveCredentials(username: string, password: string): Promise<void> {
     try {
-      await Keychain.setGenericPassword(username, password);
+      const useKeychain = await checkKeychainAvailability();
+      if (useKeychain) {
+        try {
+          await Keychain.setGenericPassword(username, password, {
+            service: CREDENTIALS_SERVICE,
+          });
+          return;
+        } catch (keychainError) {
+          // Keychain failed, fallback to AsyncStorage
+          console.warn('[StorageService] Keychain save credentials failed, using AsyncStorage:', keychainError);
+        }
+      }
+      // Fallback to AsyncStorage
+      await AsyncStorage.setItem(`${CREDENTIALS_SERVICE}_username`, username);
+      await AsyncStorage.setItem(`${CREDENTIALS_SERVICE}_password`, password);
     } catch (error) {
-      console.error('Error saving credentials:', error);
-      throw error;
+      console.error('[StorageService] Error saving credentials:', error);
+      // Don't throw - allow app to continue
     }
   }
 
   static async getCredentials(): Promise<{ username: string; password: string } | null> {
     try {
-      const credentials = await Keychain.getGenericPassword();
-      
-      if (credentials) {
-        return {
-          username: credentials.username,
-          password: credentials.password,
-        };
+      const useKeychain = await checkKeychainAvailability();
+      if (useKeychain) {
+        try {
+          const credentials = await Keychain.getGenericPassword({
+            service: CREDENTIALS_SERVICE,
+          });
+          if (credentials && typeof credentials === 'object' && 'username' in credentials && 'password' in credentials) {
+            return {
+              username: credentials.username,
+              password: credentials.password,
+            };
+          }
+        } catch (keychainError) {
+          // Keychain failed, fallback to AsyncStorage
+          console.warn('[StorageService] Keychain get credentials failed, using AsyncStorage:', keychainError);
+        }
+      }
+      // Fallback to AsyncStorage
+      const username = await AsyncStorage.getItem(`${CREDENTIALS_SERVICE}_username`);
+      const password = await AsyncStorage.getItem(`${CREDENTIALS_SERVICE}_password`);
+      if (username && password) {
+        return { username, password };
       }
       return null;
     } catch (error) {
-      console.error('Error getting credentials:', error);
+      console.error('[StorageService] Error getting credentials:', error);
       return null;
     }
   }
 
   static async clearCredentials(): Promise<void> {
     try {
-      await Keychain.resetGenericPassword();
+      const useKeychain = await checkKeychainAvailability();
+      if (useKeychain) {
+        try {
+          await Keychain.resetGenericPassword({
+            service: CREDENTIALS_SERVICE,
+          });
+        } catch (keychainError) {
+          console.warn('[StorageService] Keychain clear credentials failed, using AsyncStorage:', keychainError);
+        }
+      }
+      // Fallback to AsyncStorage
+      await AsyncStorage.removeItem(`${CREDENTIALS_SERVICE}_username`);
+      await AsyncStorage.removeItem(`${CREDENTIALS_SERVICE}_password`);
     } catch (error) {
-      console.error('Error clearing credentials:', error);
+      console.error('[StorageService] Error clearing credentials:', error);
     }
   }
 

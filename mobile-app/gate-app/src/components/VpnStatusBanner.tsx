@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
@@ -31,6 +32,7 @@ const statusCopy: Record<
 
 const VpnStatusBanner: React.FC<Props> = ({ status, message, onRetry }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [isOpeningVpn, setIsOpeningVpn] = useState(false);
 
   if (status === 'online') {
@@ -44,23 +46,47 @@ const VpnStatusBanner: React.FC<Props> = ({ status, message, onRetry }) => {
     setIsOpeningVpn(true);
     
     try {
-      // Try to open WireGuard app with deep link directly
-      // On Android, canOpenURL may return false even if app is installed,
-      // so we try to open directly first
-      const wireguardUrl = `wireguard://activate?tunnel=${encodeURIComponent(WIREGUARD_TUNNEL_NAME)}`;
-      
-      try {
-        // Try to open WireGuard deep link directly
-        await Linking.openURL(wireguardUrl);
-        console.log('[VpnStatusBanner] WireGuard deep link opened');
-        // Give it a moment, then check if it worked
-        // If WireGuard is installed, it should open
-        setTimeout(() => {
-          setIsOpeningVpn(false);
-        }, 500);
-        return; // Exit early, let WireGuard handle it
-      } catch (deepLinkError) {
-        console.log('[VpnStatusBanner] WireGuard deep link failed, trying VPN settings:', deepLinkError);
+      if (Platform.OS === 'android') {
+        // On Android, try to open WireGuard app directly by package name
+        try {
+          // Method 1: Try to open WireGuard app directly
+          const wireguardPackage = 'com.wireguard.android';
+          const wireguardIntent = `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;component=${wireguardPackage}/.ui.MainActivity;end`;
+          await Linking.openURL(wireguardIntent);
+          console.log('[VpnStatusBanner] WireGuard app opened via intent');
+          setTimeout(() => {
+            setIsOpeningVpn(false);
+          }, 500);
+          return;
+        } catch (intentError) {
+          console.log('[VpnStatusBanner] WireGuard intent failed, trying deep link:', intentError);
+        }
+        
+        // Method 2: Try WireGuard deep link
+        try {
+          const wireguardUrl = `wireguard://activate?tunnel=${encodeURIComponent(WIREGUARD_TUNNEL_NAME)}`;
+          await Linking.openURL(wireguardUrl);
+          console.log('[VpnStatusBanner] WireGuard deep link opened');
+          setTimeout(() => {
+            setIsOpeningVpn(false);
+          }, 500);
+          return;
+        } catch (deepLinkError) {
+          console.log('[VpnStatusBanner] WireGuard deep link failed:', deepLinkError);
+        }
+      } else {
+        // On iOS, try WireGuard deep link
+        try {
+          const wireguardUrl = `wireguard://activate?tunnel=${encodeURIComponent(WIREGUARD_TUNNEL_NAME)}`;
+          await Linking.openURL(wireguardUrl);
+          console.log('[VpnStatusBanner] WireGuard deep link opened (iOS)');
+          setTimeout(() => {
+            setIsOpeningVpn(false);
+          }, 500);
+          return;
+        } catch (deepLinkError) {
+          console.log('[VpnStatusBanner] WireGuard deep link failed (iOS):', deepLinkError);
+        }
       }
       
       // If deep link failed, try to open VPN settings
@@ -128,7 +154,7 @@ const VpnStatusBanner: React.FC<Props> = ({ status, message, onRetry }) => {
   const showRetryButton = status !== 'checking';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
+    <View style={[styles.container, { backgroundColor: colors.card, paddingTop: Math.max(insets.top, 8) }]}>
       <View style={styles.iconWrapper}>
         {status === 'checking' ? (
           <ActivityIndicator color={colors.accent} size="small" />

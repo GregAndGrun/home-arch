@@ -118,6 +118,8 @@ const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerConte
                   <Animated.View 
                     style={{ 
                       marginRight: 12,
+                      justifyContent: 'center',
+                      alignItems: 'center',
                       transform: [
                         { scale: iconScaleAnim },
                         { rotate: iconRotationAnim.interpolate({
@@ -136,6 +138,8 @@ const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerConte
                     styles.headerTitle, 
                     { 
                       fontFamily: typography.fontFamily.bold,
+                      includeFontPadding: false,
+                      textAlignVertical: 'center',
                     }
                   ]}
                 >
@@ -229,6 +233,9 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: '#FFFFFF',
     textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    lineHeight: 32,
   },
   contentContainer: {
     flex: 1,

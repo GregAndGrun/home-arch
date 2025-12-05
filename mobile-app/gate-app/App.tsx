@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus, Platform, Text, Animated } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useFonts } from 'expo-font';
+// import { useFonts } from 'expo-font'; // Not used - removed to prevent potential issues
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import GatesScreen from './src/screens/GatesScreen';

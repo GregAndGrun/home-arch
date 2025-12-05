@@ -37,9 +37,13 @@ class ActivityService {
       `);
       
       this.initialized = true;
+      console.log('[ActivityService] Database initialized successfully');
     } catch (error) {
       console.error('[ActivityService] Failed to initialize database:', error);
-      throw error;
+      // Don't throw error - allow app to continue without database
+      // Database operations will gracefully fail if not initialized
+      this.initialized = false;
+      this.db = null;
     }
   }
 
@@ -52,8 +56,9 @@ class ActivityService {
     try {
       await this.initialize();
       
-      if (!this.db) {
-        throw new Error('Database not initialized');
+      if (!this.db || !this.initialized) {
+        console.warn('[ActivityService] Database not initialized, skipping activity record');
+        return;
       }
 
       const timestamp = Date.now();
@@ -64,6 +69,7 @@ class ActivityService {
       );
     } catch (error) {
       console.error('[ActivityService] Failed to record activity:', error);
+      // Don't throw - allow app to continue
     }
   }
 

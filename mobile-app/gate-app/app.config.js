@@ -11,18 +11,13 @@ module.exports = {
     userInterfaceStyle: 'light',
     newArchEnabled: true,
     scheme: 'smarthome',
-    extra: {
-      eas: {
-        projectId: '45c2c77b-51c8-4c87-b7f2-7d9b772be609',
-      },
-    },
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
       backgroundColor: '#000000',
     },
     ios: {
-      bundleIdentifier: 'com.smarthome.app',
+      bundleIdentifier: 'com.grunert.smarthome',
       supportsTablet: true,
       jsEngine: 'hermes', // Enable Hermes for better performance and DevTools support
       infoPlist: {
@@ -39,9 +34,13 @@ module.exports = {
       predictiveBackGestureEnabled: false,
       jsEngine: 'hermes', // Enable Hermes for better performance and DevTools support
       permissions: [
+        'android.permission.INTERNET',
         'android.permission.RECEIVE_BOOT_COMPLETED',
         'android.permission.VIBRATE',
       ],
+      // Allow HTTP (cleartext) traffic for local ESP32 devices
+      // Required because ESP32 uses HTTP, not HTTPS
+      usesCleartextTraffic: true,
     },
     // Disable dev menu in production builds
     developmentClient: {
@@ -61,6 +60,9 @@ module.exports = {
       favicon: './assets/favicon.png',
     },
     extra: {
+      eas: {
+        projectId: '45c2c77b-51c8-4c87-b7f2-7d9b772be609',
+      },
       // Expose environment variables to the app via expo-constants
       gateEntranceIp: process.env.GATE_ENTRANCE_IP || '192.168.1.100',
       gateGarageIp: process.env.GATE_GARAGE_IP || '192.168.0.103',

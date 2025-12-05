@@ -1,0 +1,24 @@
+#!/usr/bin/expect -f
+
+set timeout 300
+
+spawn eas build --platform ios --profile preview --auto-submit
+
+expect {
+    "*Configure this project*" {
+        send "y\r"
+        exp_continue
+    }
+    "*iOS app only uses standard/exempt encryption*" {
+        send "y\r"
+        exp_continue
+    }
+    "*Do you want to continue*" {
+        send "y\r"
+        exp_continue
+    }
+    eof
+}
+
+wait
+

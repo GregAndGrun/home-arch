@@ -124,20 +124,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     loadSavedCredentials();
     
     // Automatycznie wywołaj biometrię jeśli jest dostępna i są zapisane dane
+    // Zwiększone opóźnienie, aby UI się załadowało i użytkownik zobaczył ekran logowania
     const timeoutId = setTimeout(() => {
       if (Platform.OS === 'web') {
         return;
       }
 
-      StorageService.getCredentials().then((credentials) => {
-        if (credentials && !loading) {
+      // Sprawdź czy biometria jest dostępna i są zapisane credentials
+      Promise.all([
+        BiometricsService.isBiometricsAvailable(),
+        StorageService.getCredentials()
+      ]).then(([biometricAvailable, credentials]) => {
+        if (biometricAvailable && credentials && !loading) {
           // Automatycznie wywołaj biometrię tylko jeśli nie ma już trwającego logowania
           handleBiometricLogin();
         }
       }).catch(() => {
         // Cicho zignoruj błędy
       });
-    }, 800); // Krótkie opóźnienie, aby UI się załadowało
+    }, 1000); // Zwiększone opóźnienie, aby UI się załadowało
 
     return () => clearTimeout(timeoutId);
   }, [handleBiometricLogin, loading]);
@@ -205,30 +210,28 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 autoCorrect={false}
               />
 
-              <View style={[styles.buttonContainer, { backgroundColor: hexToRgba(gradientStart, 0.1) }]}>
-                <View style={[styles.gradientOverlay, { backgroundColor: hexToRgba(gradientEnd, 0.08) }]} />
-                <TouchableOpacity
-                  style={[
-                    styles.button,
-                    loading && styles.buttonDisabled,
-                  ]}
-                  onPress={handleLogin}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={[styles.buttonText, { 
-                      color: '#FFFFFF', 
-                      fontFamily: typography.fontFamily.bold,
-                      fontWeight: '700',
-                    }]}>
-                      LOGIN
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  { backgroundColor: hexToRgba(accentColor, 0.5) },
+                  loading && styles.buttonDisabled,
+                ]}
+                onPress={handleLogin}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.buttonText, { 
+                    color: '#FFFFFF', 
+                    fontFamily: typography.fontFamily.bold,
+                    fontWeight: '700',
+                  }]}>
+                    LOGIN
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
 
             <View style={styles.footer}>
@@ -305,24 +308,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  buttonContainer: {
-    borderRadius: 0,
-    marginTop: 10,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  gradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
   button: {
     borderRadius: 0, // Kwadratowy
     padding: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 56,
+    overflow: 'hidden',
   },
   buttonDisabled: {
     opacity: 0.5,

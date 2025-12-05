@@ -313,7 +313,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <View style={styles.contactInfo}>
               <MaterialIcons name="phone" size={20} color={colors.accent} style={styles.contactIcon} />
               <Text style={[styles.logoutText, { color: colors.textPrimary, fontFamily: typography.fontFamily.medium }]}>
-                796 242 695
+                +48 796 242 695
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
