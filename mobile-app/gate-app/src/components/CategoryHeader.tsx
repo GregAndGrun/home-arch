@@ -115,10 +115,11 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ selectedCategory, onSel
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 10,
+    marginTop: 15,
   },
   scrollContent: {
-    paddingHorizontal: 10,
+    paddingLeft: 30,
+    paddingRight: 10,
     gap: 12,
   },
   item: {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, LayoutAnimation, Platform, UIManager, useWindowDimensions } from 'react-native';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -85,14 +85,32 @@ const ACCENT_COLORS = [
   return hueA - hueB;
 });
 
-const INITIAL_COLORS_COUNT = 6;
+const COLOR_SIZE = 36;
+const COLOR_MARGIN = 8;
+const CONTAINER_PADDING = 32; // padding z SettingsScreen content (16 * 2)
+const SECTION_PADDING = 32; // padding z SettingsScreen section (16 * 2)
 
 const ColorPicker: React.FC<ColorPickerProps> = ({ selectedColor, onColorSelect }) => {
   const { colors } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
   // Zapamiętaj początkową kolejność kolorów (z wybranym na początku) - tylko raz przy montowaniu
   const sortedColorsRef = useRef<typeof ACCENT_COLORS>(ACCENT_COLORS);
   const [sortedColors, setSortedColors] = useState<typeof ACCENT_COLORS>(ACCENT_COLORS);
+
+  // Oblicz ile kolorów mieści się w jednej linii
+  const calculateColorsPerRow = () => {
+    // Szerokość dostępna dla kolorów (ekran minus padding kontenera i sekcji)
+    const availableWidth = screenWidth - CONTAINER_PADDING - SECTION_PADDING;
+    // Szerokość jednego koloru z marginesem
+    const colorWithMargin = COLOR_SIZE + COLOR_MARGIN;
+    // Oblicz ile kolorów mieści się (zaokrąglij w dół)
+    // Odejmij jeden margines, bo ostatni kolor nie ma marginesu z prawej
+    const colorsPerRow = Math.floor((availableWidth + COLOR_MARGIN) / colorWithMargin);
+    return Math.max(1, colorsPerRow); // Minimum 1 kolor
+  };
+
+  const colorsPerRow = calculateColorsPerRow();
 
   // Sortuj kolory tylko raz przy montowaniu komponentu
   useEffect(() => {
@@ -115,11 +133,13 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ selectedColor, onColorSelect 
     setExpanded(!expanded);
   };
 
-  const visibleColors = expanded ? sortedColors : sortedColors.slice(0, INITIAL_COLORS_COUNT);
+  // Przed rozwinięciem: tylko kolory mieszczące się w jednej linii
+  // Po rozwinięciu: wszystkie kolory
+  const visibleColors = expanded ? sortedColors : sortedColors.slice(0, colorsPerRow);
 
   return (
     <View style={styles.container}>
-      <View style={styles.colorGrid}>
+      <View style={[styles.colorGrid, { flexWrap: expanded ? 'wrap' : 'nowrap' }]}>
         {visibleColors.map((color) => {
           const isSelected = color.value === selectedColor;
           return (
@@ -129,19 +149,18 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ selectedColor, onColorSelect 
                 styles.colorCircle,
                 { backgroundColor: color.value },
                 isSelected && styles.selectedCircle,
-                styles.colorCircleMargin,
               ]}
               onPress={() => onColorSelect(color.value)}
               activeOpacity={0.7}
             >
               {isSelected && (
-                <MaterialIcons name="check" size={20} color="#FFFFFF" />
+                <MaterialIcons name="check" size={18} color="#FFFFFF" />
               )}
             </TouchableOpacity>
           );
         })}
       </View>
-      {ACCENT_COLORS.length > INITIAL_COLORS_COUNT && (
+      {sortedColors.length > colorsPerRow && (
         <TouchableOpacity
           style={styles.expandButton}
           onPress={toggleExpanded}
@@ -167,13 +186,14 @@ const styles = StyleSheet.create({
   },
   colorGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    width: '100%',
   },
   colorCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: 'transparent',
     justifyContent: 'center',
@@ -183,9 +203,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
-  },
-  colorCircleMargin: {
-    margin: 6,
+    marginRight: 8,
+    marginBottom: 8,
   },
   selectedCircle: {
     borderWidth: 3,

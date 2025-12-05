@@ -409,7 +409,7 @@ function AppContent() {
       />
       {isAuthenticated ? (
         <>
-          <View style={styles.screenContainer} key={currentTab}>
+          <View style={styles.screenContainer}>
             {renderScreen()}
           </View>
           <BottomTabBar currentRoute={currentTab} onNavigate={handleTabNavigate} />

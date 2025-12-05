@@ -225,9 +225,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onDevicePress, onCategoryPress,
 const styles = StyleSheet.create({
   headerTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingHorizontal: 10,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    marginTop: 15,
+    marginBottom: 15,
+    paddingLeft: 30,
+    paddingRight: 10,
   },
   greeting: {
     fontSize: 24,

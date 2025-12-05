@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -32,12 +32,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
-  const [biometricType, setBiometricType] = useState('');
-
-  useEffect(() => {
-    checkBiometrics();
-    loadSavedCredentials();
-  }, []);
 
   const checkBiometrics = async () => {
     if (Platform.OS === 'web') {
@@ -47,12 +41,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     const available = await BiometricsService.isBiometricsAvailable();
     setBiometricsAvailable(available);
-
-    if (available) {
-      const types = await BiometricsService.getSupportedAuthenticationTypes();
-      const typeText = BiometricsService.getAuthenticationTypeText(types);
-      setBiometricType(typeText);
-    }
   };
 
   const loadSavedCredentials = async () => {
@@ -87,40 +75,72 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleBiometricLogin = async () => {
-    if (!biometricsAvailable) {
-      Alert.alert('Biometria niedostępna', 'Biometria nie jest dostępna na tym urządzeniu');
+  const handleBiometricLogin = useCallback(async () => {
+    if (Platform.OS === 'web') {
       return;
     }
-
-    // First authenticate with biometrics
-    const biometricSuccess = await BiometricsService.authenticate('Zaloguj się do Smart Home');
-    
-    if (!biometricSuccess) {
-      return; // User cancelled or authentication failed
-    }
-
-    // Get saved credentials
-    const credentials = await StorageService.getCredentials();
-    
-    if (!credentials) {
-      Alert.alert('Brak zapisanych danych', 'Najpierw zaloguj się używając nazwy użytkownika i hasła');
-      return;
-    }
-
-    setLoading(true);
 
     try {
-      await ApiService.login(credentials.username, credentials.password);
-      onLoginSuccess();
-    } catch (error: any) {
-      Alert.alert('Logowanie nieudane', error.message || 'Nieprawidłowe dane logowania');
-      // Clear invalid credentials
-      await StorageService.clearCredentials();
-    } finally {
-      setLoading(false);
+      const available = await BiometricsService.isBiometricsAvailable();
+      if (!available) {
+        return;
+      }
+
+      // First authenticate with biometrics
+      const biometricSuccess = await BiometricsService.authenticate('Zaloguj się do Smart Home');
+      
+      if (!biometricSuccess) {
+        return; // User cancelled or authentication failed
+      }
+
+      // Get saved credentials
+      const credentials = await StorageService.getCredentials();
+      
+      if (!credentials) {
+        // Nie pokazuj alertu przy automatycznym wywoływaniu
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        await ApiService.login(credentials.username, credentials.password);
+        onLoginSuccess();
+      } catch (error: any) {
+        Alert.alert('Logowanie nieudane', error.message || 'Nieprawidłowe dane logowania');
+        // Clear invalid credentials
+        await StorageService.clearCredentials();
+      } finally {
+        setLoading(false);
+      }
+    } catch (error) {
+      // Cicho zignoruj błędy przy automatycznym wywoływaniu
+      console.log('Biometric login error:', error);
     }
-  };
+  }, [onLoginSuccess]);
+
+  useEffect(() => {
+    checkBiometrics();
+    loadSavedCredentials();
+    
+    // Automatycznie wywołaj biometrię jeśli jest dostępna i są zapisane dane
+    const timeoutId = setTimeout(() => {
+      if (Platform.OS === 'web') {
+        return;
+      }
+
+      StorageService.getCredentials().then((credentials) => {
+        if (credentials && !loading) {
+          // Automatycznie wywołaj biometrię tylko jeśli nie ma już trwającego logowania
+          handleBiometricLogin();
+        }
+      }).catch(() => {
+        // Cicho zignoruj błędy
+      });
+    }, 800); // Krótkie opóźnienie, aby UI się załadowało
+
+    return () => clearTimeout(timeoutId);
+  }, [handleBiometricLogin, loading]);
 
   return (
     <KeyboardAvoidingView
@@ -209,29 +229,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   )}
                 </TouchableOpacity>
               </View>
-
-              {biometricsAvailable && (
-                <TouchableOpacity
-                  style={[
-                    styles.biometricButton,
-                    { borderColor: colors.accent },
-                    loading && styles.buttonDisabled,
-                  ]}
-                  onPress={handleBiometricLogin}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons 
-                    name={biometricType.toLowerCase().includes('face') ? 'face' : 'fingerprint'} 
-                    size={24} 
-                    color={colors.accent} 
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={[styles.biometricButtonText, { color: colors.accent, fontFamily: typography.fontFamily.medium }]}>
-                    Zaloguj się {biometricType}
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
 
             <View style={styles.footer}>
@@ -334,19 +331,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-  },
-  biometricButton: {
-    borderRadius: 0,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    borderWidth: 2,
-    flexDirection: 'row',
-  },
-  biometricButtonText: {
-    fontSize: 14,
-    letterSpacing: 0.5,
   },
   footer: {
     marginTop: 30,

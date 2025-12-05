@@ -140,15 +140,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
   };
 
   const handleContactEmail = () => {
-    Linking.openURL('mailto:kontakt@grunert.pl?subject=Kontakt z aplikacji Smart Home');
+    Linking.openURL('mailto:biuro@grunert.pl?subject=Kontakt z aplikacji Smart Home');
   };
 
   const handleContactWebsite = () => {
-    Linking.openURL('https://www.grunert.pl');
+    Linking.openURL('https://grunert.pl');
   };
 
   const handleContactPhone = () => {
-    Linking.openURL('tel:+48123456789');
+    Linking.openURL('tel:+48796242695');
   };
 
   return (
@@ -289,7 +289,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <View style={styles.contactInfo}>
               <MaterialIcons name="email" size={20} color={colors.accent} style={styles.contactIcon} />
               <Text style={[styles.logoutText, { color: colors.textPrimary, fontFamily: typography.fontFamily.medium }]}>
-                kontakt@grunert.pl
+                biuro@grunert.pl
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
@@ -301,7 +301,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <View style={styles.contactInfo}>
               <MaterialIcons name="language" size={20} color={colors.accent} style={styles.contactIcon} />
               <Text style={[styles.logoutText, { color: colors.textPrimary, fontFamily: typography.fontFamily.medium }]}>
-                www.grunert.pl
+                https://grunert.pl
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
@@ -313,7 +313,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
             <View style={styles.contactInfo}>
               <MaterialIcons name="phone" size={20} color={colors.accent} style={styles.contactIcon} />
               <Text style={[styles.logoutText, { color: colors.textPrimary, fontFamily: typography.fontFamily.medium }]}>
-                +48 XXX XXX XXX
+                796 242 695
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />

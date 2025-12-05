@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Platform, Animated } from 'react-native';
+import React, { useEffect, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, Platform, Animated, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/useTheme';
@@ -11,89 +11,145 @@ interface SplitScreenProps {
   titleIcon?: keyof typeof MaterialIcons.glyphMap;
   headerContent?: React.ReactNode;
   children: React.ReactNode;
+  onBack?: () => void;
 }
 
-const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerContent, children }) => {
+const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerContent, children, onBack }) => {
   const { colors, accentColor } = useTheme();
-  const [gradientStart, gradientEnd] = generateGradient(accentColor);
+  const headerRef = useRef<View>(null);
   
-  // Dodajemy kolor pośredni dla bardziej płynnego gradientu
-  const gradientColors = [gradientEnd, accentColor, gradientStart];
+  // Zapamiętaj gradient - nie przeliczaj przy każdym renderze
+  const gradientColors = useMemo(() => {
+    const [gradientStart, gradientEnd] = generateGradient(accentColor);
+    return [gradientEnd, accentColor, gradientStart];
+  }, [accentColor]);
 
-  // Animacje
-  const headerFadeAnim = useRef(new Animated.Value(0)).current;
-  const iconScaleAnim = useRef(new Animated.Value(0)).current;
+  // Animacje tylko dla contentu (nie dla headera!)
   const contentFadeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Animacja ikonki przy przełączaniu stron
+  const iconScaleAnim = useRef(new Animated.Value(1)).current;
+  const iconRotationAnim = useRef(new Animated.Value(0)).current;
+  const iconOpacityAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Animacja headera i contentu
-    Animated.parallel([
-      Animated.timing(headerFadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.spring(iconScaleAnim, {
-        toValue: 1,
-        friction: 3,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(contentFadeAnim, {
-        toValue: 1,
-        duration: 300,
-        delay: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // Animacja tylko dla contentu
+    Animated.timing(contentFadeAnim, {
+      toValue: 1,
+      duration: 300,
+      delay: 200,
+      useNativeDriver: true,
+    }).start();
   }, []);
+
+  // Animacja ikonki przy zmianie titleIcon
+  useEffect(() => {
+    if (titleIcon) {
+      // Reset animacji
+      iconScaleAnim.setValue(0.7);
+      iconRotationAnim.setValue(-0.3);
+      iconOpacityAnim.setValue(0.3);
+      
+      // Animacja: mignięcie + scale + rotation
+      Animated.parallel([
+        Animated.timing(iconOpacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(iconScaleAnim, {
+          toValue: 1,
+          friction: 3,
+          tension: 50,
+          useNativeDriver: true,
+        }),
+        Animated.spring(iconRotationAnim, {
+          toValue: 0,
+          friction: 4,
+          tension: 60,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [titleIcon]);
+
+  const handleHeaderLayout = (event: any) => {
+    const { height } = event.nativeEvent.layout;
+    // Wymuś stałą wysokość 250px jeśli się zmieniła
+    if (headerRef.current && Math.abs(height - 250) > 0.5) {
+      headerRef.current.setNativeProps({ style: { height: 250, minHeight: 250, maxHeight: 250 } });
+    }
+  };
+
+  // Stały padding dla safe area (typowe wartości dla iOS/Android)
+  const safeAreaTop = Platform.OS === 'ios' ? 44 : 24;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.headerContainer}>
+      <View 
+        ref={headerRef}
+        style={styles.headerContainer} 
+        collapsable={false} 
+        removeClippedSubviews={false}
+        onLayout={handleHeaderLayout}
+      >
         <LinearGradient
           colors={gradientColors} // Ciemny -> Średni -> Jasny
           locations={[0, 0.5, 1]} // Pozycje kolorów dla bardziej wyraźnego gradientu
           start={{ x: 0, y: 1 }} // Lewy dolny róg
           end={{ x: 1, y: 0 }} // Prawy górny róg
           style={StyleSheet.absoluteFill}
+          pointerEvents="none"
         />
-        <SafeAreaView style={styles.safeAreaContent}>
-          <Animated.View 
-            style={[
-              styles.headerContent,
-              { opacity: headerFadeAnim }
-            ]}
-          >
+        <View style={[styles.safeAreaContent, { paddingTop: safeAreaTop }]}>
+          <View style={styles.headerContent}>
+            {onBack && (
+              <TouchableOpacity 
+                onPress={onBack} 
+                style={[styles.backButton, { top: safeAreaTop + 20 + 15 }]}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="chevron-left" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
             {title && (
               <View style={styles.titleContainer}>
                 {titleIcon && (
                   <Animated.View 
                     style={{ 
                       marginRight: 12,
-                      opacity: headerFadeAnim,
-                      transform: [{ scale: iconScaleAnim }],
+                      transform: [
+                        { scale: iconScaleAnim },
+                        { rotate: iconRotationAnim.interpolate({
+                          inputRange: [-0.3, 0],
+                          outputRange: ['-0.3rad', '0rad'],
+                        })},
+                      ],
+                      opacity: iconOpacityAnim,
                     }}
                   >
                     <MaterialIcons name={titleIcon} size={32} color="#FFFFFF" />
                   </Animated.View>
                 )}
-                <Animated.Text 
+                <Text 
                   style={[
                     styles.headerTitle, 
                     { 
                       fontFamily: typography.fontFamily.bold,
-                      opacity: headerFadeAnim,
                     }
                   ]}
                 >
                   {title}
-                </Animated.Text>
+                </Text>
               </View>
             )}
-            {headerContent}
-          </Animated.View>
-        </SafeAreaView>
+            {headerContent && (
+              <View style={styles.headerContentWrapper}>
+                {headerContent}
+              </View>
+            )}
+          </View>
+        </View>
       </View>
       
       <Animated.View
@@ -114,28 +170,60 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    height: '35%',
+    height: 250,
     minHeight: 250,
+    maxHeight: 250,
+    width: '100%',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 40 : 0,
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     overflow: 'hidden',
   },
   safeAreaContent: {
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 1,
-    height: '100%',
     justifyContent: 'flex-start',
   },
   headerContent: {
     paddingTop: 20,
-    flex: 1,
+    height: 250,
+    overflow: 'hidden',
+  },
+  headerContentWrapper: {
+    minHeight: 160,
+    overflow: 'visible',
+    paddingHorizontal: 0,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    zIndex: 20,
+    paddingVertical: 0,
+    paddingHorizontal: 16,
+    borderRadius: 0,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 50,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginTop: 15,
+    marginBottom: 20,
+    height: 32,
   },
   headerTitle: {
     fontSize: 28,
@@ -144,7 +232,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginTop: -30,
+    marginTop: 250,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     overflow: 'hidden',

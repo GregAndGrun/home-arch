@@ -197,19 +197,11 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
     return names[room];
   };
 
-  const HeaderContent = () => (
-    <View style={styles.headerRow}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <SplitScreen 
       title={getCategoryName()} 
       titleIcon={getCategoryIcon()}
-      headerContent={<HeaderContent />}
+      onBack={onBack}
     >
       <ScrollView
         contentContainerStyle={styles.contentContainer}

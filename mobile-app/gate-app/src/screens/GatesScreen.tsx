@@ -158,16 +158,8 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
     );
   };
 
-  const HeaderContent = () => (
-    <View style={styles.headerRow}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
-    <SplitScreen title="Bramy" titleIcon="blinds" headerContent={<HeaderContent />}>
+    <SplitScreen title="Bramy" titleIcon="blinds" onBack={onBack}>
       {!isConnected && (
         <View style={[styles.offlineBanner, { backgroundColor: colors.warning }]}>
           <Text style={styles.offlineText}>⚠️ Brak połączenia z siecią</Text>

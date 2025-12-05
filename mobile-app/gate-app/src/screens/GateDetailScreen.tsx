@@ -129,13 +129,6 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     }
   };
 
-  const HeaderContent = () => (
-    <View style={styles.headerRow}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-    </View>
-  );
 
   // Memoize graph bars to prevent unnecessary re-renders
   const graphBars = useMemo(() => {
@@ -185,7 +178,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   };
 
   return (
-    <SplitScreen title={gateName} headerContent={<HeaderContent />}>
+    <SplitScreen title={gateName} onBack={onBack}>
       <ScrollView
         contentContainerStyle={styles.contentContainer}
         refreshControl={
