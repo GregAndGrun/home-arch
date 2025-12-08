@@ -643,6 +643,47 @@ void setupWebServer(AsyncWebServer& server,
     request->send(200, "application/json", "{\"success\":true}");
   });
   
+  // Change password endpoint
+  server.on("/api/auth/change-password", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
+    request->send(200);
+  });
+  
+  server.on("/api/auth/change-password", HTTP_POST,
+    [&auth](AsyncWebServerRequest *request) {},
+    NULL,
+    [&auth](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      
+    if (!authorizeRequest(request, auth)) {
+      request->send(401, "application/json", "{\"error\":\"Unauthorized\"}");
+      return;
+    }
+    
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, (const char*)data);
+    
+    if (error) {
+      request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+      return;
+    }
+    
+    String oldPassword = doc["oldPassword"] | "";
+    String newPassword = doc["newPassword"] | "";
+    String clientIP = getClientIP(request);
+    
+    if (oldPassword.length() == 0 || newPassword.length() == 0) {
+      request->send(400, "application/json", "{\"error\":\"Missing required fields\"}");
+      return;
+    }
+    
+    bool success = auth.changePassword(oldPassword, newPassword, clientIP);
+    
+    if (success) {
+      request->send(200, "application/json", "{\"success\":true,\"message\":\"Password changed successfully\"}");
+    } else {
+      request->send(400, "application/json", "{\"error\":\"Failed to change password. Check old password and ensure new password is at least 6 characters.\"}");
+    }
+  });
+  
   // Gate status endpoint
   server.on("/api/gates/status", HTTP_GET, [&auth
     #if ENABLE_GATE1

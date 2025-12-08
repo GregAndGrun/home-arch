@@ -1,24 +1,30 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- Czarne tło -->
-  <rect width="1024" height="1024" fill="#000000"/>
+  <!-- Żółte tło (mustard yellow) -->
+  <rect width="1024" height="1024" fill="#F5A623"/>
   
-  <!-- Kontury domu - białe -->
-  <!-- Dach (trójkąt) -->
-  <path d="M 512 150 L 250 400 L 774 400 Z" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Dom - biały kontur -->
+  <!-- Dach (trójkąt) - biały kontur -->
+  <path d="M 512 250 L 320 550 L 704 550 Z" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Komin - mały prostokąt na dachu po prawej stronie -->
+  <rect x="620" y="200" width="60" height="80" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
   
   <!-- Ściany domu -->
-  <rect x="280" y="400" width="464" height="400" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="340" y="550" width="344" height="300" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
   
-  <!-- Drzwi/Brama -->
-  <rect x="440" y="600" width="144" height="200" fill="none" stroke="#FFFFFF" stroke-width="35" stroke-linecap="round" stroke-linejoin="round" rx="8"/>
+  <!-- Drzwi -->
+  <rect x="480" y="720" width="104" height="130" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" rx="5"/>
   
   <!-- Okno lewe -->
-  <rect x="340" y="480" width="100" height="100" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" rx="8"/>
-  <line x1="390" y1="480" x2="390" y2="580" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round"/>
-  <line x1="340" y1="530" x2="440" y2="530" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round"/>
+  <rect x="380" y="600" width="70" height="70" fill="none" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round" stroke-linejoin="round" rx="5"/>
+  <line x1="415" y1="600" x2="415" y2="670" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
+  <line x1="380" y1="635" x2="450" y2="635" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
   
   <!-- Okno prawe -->
-  <rect x="584" y="480" width="100" height="100" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" rx="8"/>
-  <line x1="634" y1="480" x2="634" y2="580" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round"/>
-  <line x1="584" y1="530" x2="684" y2="530" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round"/>
+  <rect x="574" y="600" width="70" height="70" fill="none" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round" stroke-linejoin="round" rx="5"/>
+  <line x1="609" y1="600" x2="609" y2="670" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
+  <line x1="574" y1="635" x2="644" y2="635" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
+  
+  <!-- Litera G - duża, biała, wyśrodkowana w środku domu -->
+  <text x="512" y="700" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">G</text>
 </svg>

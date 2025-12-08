@@ -35,6 +35,7 @@ public:
   String login(String username, String password, String clientIP);
   bool validateToken(String token);
   void logout(String token);
+  bool changePassword(String oldPassword, String newPassword, String clientIP);
   
   // Rate limiting
   bool checkRateLimit(String clientIP);

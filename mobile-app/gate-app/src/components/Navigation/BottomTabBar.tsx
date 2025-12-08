@@ -28,7 +28,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ currentRoute, onNavigate })
         backgroundColor: colors.card, 
         borderTopColor: colors.border,
         paddingTop: 12,
-        paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, 12) : Math.max(insets.bottom, 12),
+        paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom + 8, 20) : Math.max(insets.bottom + 8, 20),
       }
     ]}>
       {tabs.map((tab) => {

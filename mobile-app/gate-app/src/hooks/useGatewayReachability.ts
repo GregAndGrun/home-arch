@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import ApiService from '../services/ApiService';
 
 export type GatewayStatus = 'checking' | 'online' | 'vpn-required' | 'offline';
 
-const CHECK_INTERVAL_MS = 15000;
+const CHECK_INTERVAL_ACTIVE_MS = 15000; // 15 seconds when app is active
+const CHECK_INTERVAL_BACKGROUND_MS = 60000; // 60 seconds when app is in background
 
 const OFFLINE_MESSAGE = 'Brak połączenia z internetem. Sprawdź Wi‑Fi lub dane komórkowe.';
 const VPN_MESSAGE = 'Brama jest poza zasięgiem. Włącz VPN lub połącz się z siecią domową.';
@@ -17,6 +19,7 @@ export const useGatewayReachability = () => {
   const netInfoRef = useRef<NetInfoState | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isCheckingRef = useRef(false);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const clearIntervalRef = () => {
     if (intervalRef.current) {
@@ -32,31 +35,23 @@ export const useGatewayReachability = () => {
 
   const performCheck = useCallback(async () => {
     if (isCheckingRef.current) {
-      console.log('[GatewayReachability] Check already in progress, skipping');
       return;
     }
 
-    console.log('[GatewayReachability] Starting gateway check...');
     isCheckingRef.current = true;
     try {
-      console.log('[GatewayReachability] Checking network connection...');
       const connection = netInfoRef.current || (await NetInfo.fetch());
-      console.log('[GatewayReachability] Network connected:', connection?.isConnected);
 
       if (!connection?.isConnected) {
-        console.log('[GatewayReachability] Network offline');
         setOffline();
         setLastChecked(Date.now());
         return;
       }
 
-      console.log('[GatewayReachability] Calling ApiService.checkHealth()...');
       await ApiService.checkHealth();
-      console.log('[GatewayReachability] Gateway is online');
       setStatus('online');
       setMessage(null);
     } catch (error) {
-      console.log('[GatewayReachability] Gateway check failed:', error);
       setStatus('vpn-required');
       if (error instanceof Error && error.message && !error.message.includes('No response')) {
         setMessage(error.message);
@@ -66,7 +61,6 @@ export const useGatewayReachability = () => {
     } finally {
       setLastChecked(Date.now());
       isCheckingRef.current = false;
-      console.log('[GatewayReachability] Check completed');
     }
   }, [setOffline]);
 
@@ -105,13 +99,42 @@ export const useGatewayReachability = () => {
     };
   }, [performCheck, setOffline]);
 
+  // Handle AppState changes for adaptive checking
   useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      appStateRef.current = nextAppState;
+      
+      // Clear existing interval
+      clearIntervalRef();
+      
+      // Set new interval based on app state
+      if (nextAppState === 'active') {
+        // App is active - check more frequently
+        intervalRef.current = setInterval(() => {
+          performCheck();
+        }, CHECK_INTERVAL_ACTIVE_MS);
+      } else {
+        // App is in background - check less frequently
+        intervalRef.current = setInterval(() => {
+          performCheck();
+        }, CHECK_INTERVAL_BACKGROUND_MS);
+      }
+    });
+
+    // Set initial interval based on current app state
     clearIntervalRef();
-    intervalRef.current = setInterval(() => {
-      performCheck();
-    }, CHECK_INTERVAL_MS);
+    if (appStateRef.current === 'active') {
+      intervalRef.current = setInterval(() => {
+        performCheck();
+      }, CHECK_INTERVAL_ACTIVE_MS);
+    } else {
+      intervalRef.current = setInterval(() => {
+        performCheck();
+      }, CHECK_INTERVAL_BACKGROUND_MS);
+    }
 
     return () => {
+      subscription.remove();
       clearIntervalRef();
     };
   }, [performCheck]);

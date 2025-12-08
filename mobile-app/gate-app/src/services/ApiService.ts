@@ -66,7 +66,6 @@ class ApiService {
               window.dispatchEvent(new CustomEvent('token-expired'));
             } catch (e) {
               // CustomEvent might not be available in React Native
-              console.warn('Could not dispatch token-expired event:', e);
             }
           }
         }
@@ -79,29 +78,17 @@ class ApiService {
     const portPart = port ? `:${port}` : '';
     this.baseURL = `http://${ipAddress}${portPart}`;
     this.axiosInstance.defaults.baseURL = this.baseURL;
-    console.log('[ApiService] Base URL updated to:', this.baseURL);
   }
 
   async login(username: string, password: string): Promise<LoginResponse> {
     try {
-      console.log('[ApiService] ==========================================');
-      console.log('[ApiService] Attempting login to:', this.baseURL);
-      console.log('[ApiService] Endpoint:', API_ENDPOINTS.LOGIN);
-      console.log('[ApiService] Full URL:', `${this.baseURL}${API_ENDPOINTS.LOGIN}`);
-      console.log('[ApiService] Username:', username);
-      console.log('[ApiService] ==========================================');
-      
       const response = await this.axiosInstance.post<LoginResponse>(
         API_ENDPOINTS.LOGIN,
         { username, password }
       );
       
-      console.log('[ApiService] Login successful! Status:', response.status);
-      console.log('[ApiService] Response data:', response.data);
-      
       if (response.data.token) {
         await StorageService.saveToken(response.data.token);
-        console.log('[ApiService] Token saved successfully');
       }
       
       return response.data;
@@ -136,6 +123,17 @@ class ApiService {
       console.error('Logout error:', error);
     } finally {
       await StorageService.clearToken();
+    }
+  }
+
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    try {
+      await this.axiosInstance.post(API_ENDPOINTS.CHANGE_PASSWORD, {
+        oldPassword,
+        newPassword,
+      });
+    } catch (error) {
+      throw this.handleError(error);
     }
   }
 
@@ -226,23 +224,12 @@ class ApiService {
 
   async checkHealth(): Promise<any> {
     try {
-      console.log('[ApiService] Checking health at:', this.baseURL);
-      // Use shorter timeout for health check to avoid blocking app startup
       const response = await this.axiosInstance.get(API_ENDPOINTS.HEALTH, {
-        timeout: 3000, // 3 seconds instead of default 10 seconds
+        timeout: 3000,
       });
-      console.log('[ApiService] Health check successful:', response.status);
       return response.data;
     } catch (error) {
       console.error('[ApiService] Health check failed:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('[ApiService] Error details:', {
-          message: error.message,
-          code: error.code,
-          response: error.response?.status,
-          baseURL: this.baseURL,
-        });
-      }
       throw this.handleError(error);
     }
   }

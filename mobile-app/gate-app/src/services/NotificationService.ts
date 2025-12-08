@@ -40,7 +40,6 @@ class NotificationService {
       }
 
       if (finalStatus !== 'granted') {
-        console.warn('Notification permissions not granted');
         return false;
       }
 

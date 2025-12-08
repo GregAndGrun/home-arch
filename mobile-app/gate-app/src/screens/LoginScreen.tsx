@@ -32,6 +32,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+  const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
 
   const checkBiometrics = async () => {
     if (Platform.OS === 'web') {
@@ -39,8 +41,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    const available = await BiometricsService.isBiometricsAvailable();
-    setBiometricsAvailable(available);
+    try {
+      const available = await BiometricsService.isBiometricsAvailable();
+      setBiometricsAvailable(available);
+    } catch (error) {
+      console.error('[LoginScreen] Error checking biometrics:', error);
+      setBiometricsAvailable(false);
+    }
   };
 
   const loadSavedCredentials = async () => {
@@ -48,10 +55,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       const credentials = await StorageService.getCredentials();
       if (credentials) {
         setUsername(credentials.username);
+        setHasSavedCredentials(true);
         // Don't auto-fill password for security
+      } else {
+        setHasSavedCredentials(false);
       }
     } catch (error) {
-      console.error('Error loading saved credentials:', error);
+      console.error('[LoginScreen] Error loading saved credentials:', error);
+      setHasSavedCredentials(false);
     }
   };
 
@@ -114,38 +125,34 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         setLoading(false);
       }
     } catch (error) {
-      // Cicho zignoruj błędy przy automatycznym wywoływaniu
-      console.log('Biometric login error:', error);
+      // Silently ignore errors during automatic invocation
     }
   }, [onLoginSuccess]);
 
   useEffect(() => {
-    checkBiometrics();
-    loadSavedCredentials();
-    
-    // Automatycznie wywołaj biometrię jeśli jest dostępna i są zapisane dane
-    // Zwiększone opóźnienie, aby UI się załadowało i użytkownik zobaczył ekran logowania
-    const timeoutId = setTimeout(() => {
-      if (Platform.OS === 'web') {
-        return;
-      }
+    const initialize = async () => {
+      await checkBiometrics();
+      await loadSavedCredentials();
+    };
+    initialize();
+  }, []);
 
-      // Sprawdź czy biometria jest dostępna i są zapisane credentials
-      Promise.all([
-        BiometricsService.isBiometricsAvailable(),
-        StorageService.getCredentials()
-      ]).then(([biometricAvailable, credentials]) => {
-        if (biometricAvailable && credentials && !loading) {
-          // Automatycznie wywołaj biometrię tylko jeśli nie ma już trwającego logowania
-          handleBiometricLogin();
-        }
-      }).catch(() => {
-        // Cicho zignoruj błędy
-      });
-    }, 1000); // Zwiększone opóźnienie, aby UI się załadowało
+  // Ustaw showBiometricPrompt gdy biometria jest dostępna i są zapisane dane
+  useEffect(() => {
+    if (Platform.OS === 'web' || loading) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      if (biometricsAvailable && hasSavedCredentials) {
+        setShowBiometricPrompt(true);
+      } else {
+        setShowBiometricPrompt(false);
+      }
+    }, 500); // Krótkie opóźnienie, aby stany się ustawiły
 
     return () => clearTimeout(timeoutId);
-  }, [handleBiometricLogin, loading]);
+  }, [biometricsAvailable, hasSavedCredentials, loading]);
 
   return (
     <KeyboardAvoidingView
@@ -177,6 +184,33 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <View style={[styles.form, { 
               backgroundColor: 'rgba(30, 30, 30, 0.85)',
             }]}>
+              {/* Opcje logowania biometrycznego - pokazuj na górze jeśli dostępne */}
+              {showBiometricPrompt && !loading ? (
+                <View style={styles.biometricOptions}>
+                  <TouchableOpacity
+                    style={styles.biometricButton}
+                    onPress={handleBiometricLogin}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons name="fingerprint" size={48} color={accentColor} />
+                    <Text style={[styles.biometricButtonText, { color: accentColor }]}>
+                      Zaloguj odciskiem
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.usePasswordButton}
+                    onPress={() => setShowBiometricPrompt(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.usePasswordButtonText, { color: colors.textSecondary }]}>
+                      Użyj hasła
+                    </Text>
+                  </TouchableOpacity>
+                  <View style={styles.divider} />
+                </View>
+              ) : null}
+
+              {/* Formularz logowania - zawsze widoczny */}
               <TextInput
                 style={[
                   styles.input,
@@ -331,6 +365,37 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  biometricOptions: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: 20,
+  },
+  biometricButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    marginBottom: 12,
+  },
+  biometricButtonText: {
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  usePasswordButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  usePasswordButtonText: {
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  divider: {
+    height: 1,
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 16,
   },
 });
 

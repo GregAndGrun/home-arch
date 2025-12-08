@@ -37,6 +37,12 @@ function AppContent() {
   const [showAnimatedContent, setShowAnimatedContent] = useState(false);
   const { status: gatewayStatus, message: gatewayMessage, refresh: refreshGatewayStatus } =
     useGatewayReachability();
+  
+  // Refs for preventing state updates after unmount and debouncing
+  const isMountedRef = useRef(true);
+  const isInitialMountRef = useRef(true);
+  const lockDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const authCheckInProgressRef = useRef(false);
 
   // Delay initial gateway check to avoid blocking app startup
   useEffect(() => {
@@ -48,10 +54,12 @@ function AppContent() {
   }, [refreshGatewayStatus]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    isInitialMountRef.current = true;
+
     // Safety timeout - always set loading to false after max 5 seconds
     const safetyTimeout = setTimeout(() => {
-      if (isLoading) {
-        console.warn('[App] Loading timeout - forcing app to continue');
+      if (isMountedRef.current && isLoading) {
         setIsLoading(false);
       }
     }, 5000);
@@ -60,32 +68,56 @@ function AppContent() {
     ActivityService.initialize()
       .then(() => {
         // Clean up old activities (older than 30 days) on startup
-        ActivityService.clearOldActivities(30).catch(err => {
-          console.warn('[App] Failed to clear old activities:', err);
+        ActivityService.clearOldActivities(30).catch(() => {
+          // Silently fail - non-critical
         });
       })
-      .catch(err => {
-        console.warn('[App] ActivityService initialization failed (non-critical):', err);
+      .catch(() => {
+        // Silently fail - non-critical
       });
 
+    // Initial authentication check
     checkAuthentication();
     
     let appStateSubscription: any = null;
     
-    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (!isMountedRef.current) return;
+
       if (nextAppState === 'background' || nextAppState === 'inactive') {
-        setIsLocked(true);
+        // Debounce lock setting to prevent rapid state changes
+        if (lockDebounceTimerRef.current) {
+          clearTimeout(lockDebounceTimerRef.current);
+        }
+        lockDebounceTimerRef.current = setTimeout(() => {
+          if (isMountedRef.current) {
+            setIsLocked(true);
+          }
+        }, 300);
       } else if (nextAppState === 'active') {
-        // Force re-render when app becomes active to prevent white screen
+        // Clear any pending lock
+        if (lockDebounceTimerRef.current) {
+          clearTimeout(lockDebounceTimerRef.current);
+          lockDebounceTimerRef.current = null;
+        }
+
+        // Skip authentication check on initial mount (already done above)
+        if (isInitialMountRef.current) {
+          isInitialMountRef.current = false;
+          return;
+        }
+
         // Set loading to false first to ensure UI renders
         setIsLoading(false);
-        // Use setTimeout to ensure state update is processed before async call
-        setTimeout(async () => {
-          await checkAuthentication();
-          // Immediately check gateway availability when app returns to foreground
-          // This is especially useful after user activates VPN in WireGuard app
-          refreshGatewayStatus();
-        }, 100);
+        
+        // Debounce gateway check to prevent rapid calls
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            // Don't run full authentication check on resume to prevent race conditions/crashes
+            // The token is verified on API calls anyway
+            refreshGatewayStatus();
+          }
+        }, 500);
       }
     };
     
@@ -93,7 +125,9 @@ function AppContent() {
     
     // Listen for token expiration events
     const handleTokenExpired = async () => {
-      await handleLogout();
+      if (isMountedRef.current) {
+        await handleLogout();
+      }
     };
     
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
@@ -101,7 +135,11 @@ function AppContent() {
     }
     
     return () => {
+      isMountedRef.current = false;
       clearTimeout(safetyTimeout);
+      if (lockDebounceTimerRef.current) {
+        clearTimeout(lockDebounceTimerRef.current);
+      }
       if (appStateSubscription) {
         appStateSubscription.remove();
       }
@@ -171,17 +209,25 @@ function AppContent() {
   // Removed - moved to useEffect to prevent stale closure issues
 
   const checkAuthentication = async () => {
+    // Prevent concurrent authentication checks
+    if (authCheckInProgressRef.current) {
+      return;
+    }
+
+    authCheckInProgressRef.current = true;
+
     // Add timeout to prevent infinite loading
     const timeoutPromise = new Promise<void>((resolve) => {
       setTimeout(() => {
-        console.warn('[App] Authentication check timeout - continuing anyway');
         resolve();
-      }, 3000); // 3 second timeout
+      }, 5000); // Increased to 5 second timeout for slower devices
     });
 
     try {
       const authPromise = (async () => {
         const token = await StorageService.getToken();
+        
+        if (!isMountedRef.current) return;
         
         if (token) {
           // Verify token is still valid
@@ -200,10 +246,19 @@ function AppContent() {
       await Promise.race([authPromise, timeoutPromise]);
     } catch (error) {
       console.error('[App] Error checking authentication:', error);
-      setIsAuthenticated(false);
+      // Don't force logout on error - keep previous state or let user try again
+      if (isMountedRef.current && !isAuthenticated) {
+        // Only set to false if we weren't already authenticated
+        // This prevents random logouts on transient errors
+        setIsAuthenticated(false);
+      }
     } finally {
-      // Always set loading to false, even if there was an error or timeout
-      setIsLoading(false);
+      authCheckInProgressRef.current = false;
+      // Only set loading to false if this is the initial mount
+      if (isMountedRef.current && isInitialMountRef.current) {
+        setIsLoading(false);
+        isInitialMountRef.current = false;
+      }
     }
   };
   

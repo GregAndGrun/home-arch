@@ -4,6 +4,7 @@ import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { StorageService } from '../services/StorageService';
 import ActivityService from '../services/ActivityService';
+import ApiService from '../services/ApiService';
 import ThemeToggle from '../components/ThemeToggle';
 import ColorPicker from '../components/ColorPicker';
 import SplitScreen from '../components/Layout/SplitScreen';
@@ -121,13 +122,25 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
 
     setChangingPassword(true);
     try {
-      // TODO: Implement API endpoint for password change
-      // For now, show message that feature requires firmware update
+      await ApiService.changePassword(oldPassword, newPassword);
+      
       Alert.alert(
-        'Funkcja w przygotowaniu',
-        'Zmiana hasła przez aplikację wymaga aktualizacji firmware. Obecnie hasło można zmienić tylko przez edycję pliku secrets.h i rekompilację firmware.',
-        [{ text: 'OK' }]
+        'Sukces',
+        'Hasło zostało zmienione pomyślnie. Zostaniesz wylogowany i musisz zalogować się ponownie.',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              // Logout after password change
+              await ApiService.logout();
+              // Clear credentials
+              await StorageService.clearCredentials();
+              // The App.tsx will detect logout and show login screen
+            },
+          },
+        ]
       );
+      
       setShowChangePassword(false);
       setOldPassword('');
       setNewPassword('');

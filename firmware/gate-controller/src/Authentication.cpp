@@ -3,6 +3,7 @@
 #include "secrets.h"
 #include "Logger.h"
 #include <Arduino.h>
+#include <Preferences.h>
 
 Authentication::Authentication() {
 }
@@ -35,8 +36,14 @@ String Authentication::login(String username, String password, String clientIP) 
     return "";
   }
   
+  // Get password from Preferences or use default from secrets.h
+  Preferences prefs;
+  prefs.begin("auth", true); // true = read-only
+  String storedPassword = prefs.getString("password", API_PASSWORD);
+  prefs.end();
+  
   // Validate credentials
-  if (username == API_USERNAME && password == API_PASSWORD) {
+  if (username == API_USERNAME && password == storedPassword) {
     // Reset failed attempts
     failedLoginAttempts[clientIP] = 0;
     
@@ -188,5 +195,42 @@ unsigned long Authentication::currentTimestamp() {
   }
   
   return (unsigned long)now;
+}
+
+bool Authentication::changePassword(String oldPassword, String newPassword, String clientIP) {
+  logInfo("Password change attempt from: " + clientIP);
+  
+  // Validate old password
+  Preferences prefs;
+  prefs.begin("auth", true); // true = read-only
+  String storedPassword = prefs.getString("password", API_PASSWORD);
+  prefs.end();
+  
+  if (oldPassword != storedPassword) {
+    logWarn("Password change failed: incorrect old password from IP: " + clientIP);
+    return false;
+  }
+  
+  // Validate new password (min 6 characters)
+  if (newPassword.length() < 6) {
+    logWarn("Password change failed: new password too short from IP: " + clientIP);
+    return false;
+  }
+  
+  // Save new password to Preferences
+  prefs.begin("auth", false); // false = read-write
+  bool success = prefs.putString("password", newPassword);
+  prefs.end();
+  
+  if (success) {
+    logInfo("Password changed successfully from IP: " + clientIP);
+    // Invalidate all existing tokens
+    validTokens.clear();
+    logInfo("All existing sessions invalidated after password change");
+    return true;
+  } else {
+    logWarn("Password change failed: could not save to Preferences from IP: " + clientIP);
+    return false;
+  }
 }
 

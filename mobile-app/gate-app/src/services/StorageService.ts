@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 const TOKEN_KEY = 'auth_token';
-const CREDENTIALS_SERVICE = 'SmartHome';
+const CREDENTIALS_SERVICE = 'SmartHome_Credentials';
+const TOKEN_SERVICE = 'SmartHome_Token';
 const SETTINGS_KEY = 'app_settings';
 const DEVICE_CONFIG_KEY = 'device_config';
 
@@ -15,42 +16,27 @@ let keychainChecked = false;
 async function checkKeychainAvailability(): Promise<boolean> {
   if (keychainChecked) return isKeychainAvailable;
   
-  // Always use AsyncStorage for web
   if (Platform.OS === 'web') {
     isKeychainAvailable = false;
     keychainChecked = true;
     return false;
   }
   
-  // Try to use Keychain, but fallback to AsyncStorage if it fails
   try {
-    // Check if Keychain module is properly initialized
-    if (!Keychain || typeof Keychain.getGenericPassword !== 'function') {
-      console.warn('[StorageService] Keychain module not available');
+    if (!Keychain || typeof Keychain.getGenericPassword !== 'function' || Keychain.getGenericPassword === null) {
       isKeychainAvailable = false;
       keychainChecked = true;
       return false;
     }
     
-    // Check if the function is not null (native module not linked)
-    if (Keychain.getGenericPassword === null) {
-      console.warn('[StorageService] Keychain native module not linked, using AsyncStorage');
-      isKeychainAvailable = false;
-      keychainChecked = true;
-      return false;
-    }
-    
-    // Try a test read to see if Keychain actually works (with timeout)
-    const testPromise = Keychain.getGenericPassword({ service: CREDENTIALS_SERVICE });
+    const testPromise = Keychain.getGenericPassword({ service: TOKEN_SERVICE });
     const timeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), 1000);
+      setTimeout(() => resolve(null), 2000);
     });
     
     await Promise.race([testPromise, timeoutPromise]);
     isKeychainAvailable = true;
   } catch (error) {
-    // Keychain not available (e.g., iOS simulator, Expo Go), use AsyncStorage
-    console.warn('[StorageService] Keychain not available, using AsyncStorage fallback:', error);
     isKeychainAvailable = false;
   }
   
@@ -66,15 +52,13 @@ export class StorageService {
       if (useKeychain) {
         try {
           await Keychain.setGenericPassword(TOKEN_KEY, token, {
-            service: CREDENTIALS_SERVICE,
+            service: TOKEN_SERVICE,
           });
           return;
         } catch (keychainError) {
           // Keychain failed, fallback to AsyncStorage
-          console.warn('Keychain save failed, using AsyncStorage:', keychainError);
         }
       }
-      // Fallback to AsyncStorage for web/iOS simulator
       await AsyncStorage.setItem(TOKEN_KEY, token);
     } catch (error) {
       console.error('Error saving token:', error);
@@ -84,12 +68,9 @@ export class StorageService {
 
   static async getToken(): Promise<string | null> {
     try {
-      // Add timeout to prevent hanging on Keychain check
       const keychainCheckPromise = checkKeychainAvailability();
       const timeoutPromise = new Promise<boolean>((resolve) => {
-        setTimeout(() => {
-          resolve(false);
-        }, 2000); // 2 second timeout
+        setTimeout(() => resolve(false), 5000);
       });
       
       const useKeychain = await Promise.race([keychainCheckPromise, timeoutPromise]);
@@ -97,14 +78,11 @@ export class StorageService {
       
       if (useKeychain) {
         try {
-          // Add timeout to Keychain operation to prevent hanging
           const keychainPromise = Keychain.getGenericPassword({
-            service: CREDENTIALS_SERVICE,
+            service: TOKEN_SERVICE,
           });
           const keychainTimeout = new Promise<false>((resolve) => {
-            setTimeout(() => {
-              resolve(false);
-            }, 2000); // 2 second timeout
+            setTimeout(() => resolve(false), 5000);
           });
           
           const credentials = await Promise.race([keychainPromise, keychainTimeout]) as { username: string; password: string } | false | null;
@@ -114,22 +92,16 @@ export class StorageService {
           }
         } catch (keychainError) {
           // Keychain failed, fallback to AsyncStorage
-          console.warn('[StorageService] Keychain get failed, using AsyncStorage:', keychainError);
         }
       }
       
-      // Fallback to AsyncStorage for web/iOS simulator
       if (!token) {
         token = await AsyncStorage.getItem(TOKEN_KEY);
       }
       
-      // Check if token is valid (not expired)
-      if (token) {
-        if (!this.isTokenValid(token)) {
-          console.warn('[StorageService] Token is expired, clearing it');
-          await this.clearToken();
-          return null;
-        }
+      if (token && !this.isTokenValid(token)) {
+        await this.clearToken();
+        return null;
       }
       
       return token;
@@ -178,56 +150,25 @@ export class StorageService {
       if (useKeychain) {
         try {
           await Keychain.resetGenericPassword({
-            service: CREDENTIALS_SERVICE,
+            service: TOKEN_SERVICE,
           });
-          // Also clear AsyncStorage as backup
-          await AsyncStorage.removeItem(TOKEN_KEY);
-          return;
         } catch (keychainError) {
-          // Keychain failed, fallback to AsyncStorage
-          console.warn('Keychain clear failed, using AsyncStorage:', keychainError);
+          // Keychain failed, continue to AsyncStorage
         }
       }
       
-      // Fallback to AsyncStorage for web/iOS simulator
       await AsyncStorage.removeItem(TOKEN_KEY);
       
-      // Also clear from localStorage directly (for web browsers)
       if (typeof window !== 'undefined' && window.localStorage) {
         try {
           window.localStorage.removeItem(TOKEN_KEY);
-          // Also try with @ prefix (AsyncStorage sometimes uses this)
           window.localStorage.removeItem('@' + TOKEN_KEY);
-          // Clear all AsyncStorage keys
-          const keys = Object.keys(window.localStorage);
-          keys.forEach(key => {
-            if (key.includes(TOKEN_KEY) || key.includes('auth_token')) {
-              window.localStorage.removeItem(key);
-            }
-          });
         } catch (e) {
-          console.warn('localStorage clear failed:', e);
+          // Ignore localStorage errors
         }
       }
-      
-      // Verify it's cleared
-      const remaining = await AsyncStorage.getItem(TOKEN_KEY);
-      if (remaining) {
-        console.warn('Token still exists after removeItem, trying again');
-        await AsyncStorage.removeItem(TOKEN_KEY);
-      }
-      
     } catch (error) {
       console.error('Error clearing token:', error);
-      // Force clear even if error
-      try {
-        await AsyncStorage.removeItem(TOKEN_KEY);
-        if (typeof window !== 'undefined' && window.localStorage) {
-          window.localStorage.removeItem(TOKEN_KEY);
-        }
-      } catch (e) {
-        console.error('Force clear also failed:', e);
-      }
     }
   }
 
@@ -240,7 +181,7 @@ export class StorageService {
         window.sessionStorage.removeItem(TOKEN_KEY);
       }
     } catch (error) {
-      console.warn('clearTokenSyncForWeb failed:', error);
+      // Ignore errors
     }
   }
 
@@ -256,7 +197,6 @@ export class StorageService {
           return;
         } catch (keychainError) {
           // Keychain failed, fallback to AsyncStorage
-          console.warn('[StorageService] Keychain save credentials failed, using AsyncStorage:', keychainError);
         }
       }
       // Fallback to AsyncStorage
@@ -284,7 +224,6 @@ export class StorageService {
           }
         } catch (keychainError) {
           // Keychain failed, fallback to AsyncStorage
-          console.warn('[StorageService] Keychain get credentials failed, using AsyncStorage:', keychainError);
         }
       }
       // Fallback to AsyncStorage
@@ -309,7 +248,7 @@ export class StorageService {
             service: CREDENTIALS_SERVICE,
           });
         } catch (keychainError) {
-          console.warn('[StorageService] Keychain clear credentials failed, using AsyncStorage:', keychainError);
+          // Keychain failed, continue to AsyncStorage
         }
       }
       // Fallback to AsyncStorage
@@ -362,7 +301,7 @@ export class StorageService {
           });
           return;
         } catch (keychainError) {
-          console.warn('Keychain save failed, using AsyncStorage:', keychainError);
+          // Keychain failed, fallback to AsyncStorage
         }
       }
       
@@ -389,7 +328,7 @@ export class StorageService {
           }
           return null;
         } catch (keychainError) {
-          console.warn('Keychain get failed, using AsyncStorage:', keychainError);
+          // Keychain failed, fallback to AsyncStorage
         }
       }
       
@@ -412,7 +351,7 @@ export class StorageService {
             service: CREDENTIALS_SERVICE + '_devices',
           });
         } catch (keychainError) {
-          console.warn('Keychain clear failed, using AsyncStorage:', keychainError);
+          // Keychain failed, continue to AsyncStorage
         }
       }
       
@@ -449,3 +388,4 @@ export class StorageService {
     await this.clearDeviceConfig();
   }
 }
+

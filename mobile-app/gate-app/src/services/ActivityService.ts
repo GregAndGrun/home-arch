@@ -37,7 +37,6 @@ class ActivityService {
       `);
       
       this.initialized = true;
-      console.log('[ActivityService] Database initialized successfully');
     } catch (error) {
       console.error('[ActivityService] Failed to initialize database:', error);
       // Don't throw error - allow app to continue without database
@@ -57,7 +56,6 @@ class ActivityService {
       await this.initialize();
       
       if (!this.db || !this.initialized) {
-        console.warn('[ActivityService] Database not initialized, skipping activity record');
         return;
       }
 

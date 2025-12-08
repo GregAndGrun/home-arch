@@ -28,18 +28,17 @@ module.exports = {
       package: 'com.smarthome.app',
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#000000',
+        backgroundColor: '#F5A623',
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      jsEngine: 'hermes', // Enable Hermes for better performance and DevTools support
+      jsEngine: 'hermes',
+      allowBackup: false,
       permissions: [
         'android.permission.INTERNET',
         'android.permission.RECEIVE_BOOT_COMPLETED',
         'android.permission.VIBRATE',
       ],
-      // Allow HTTP (cleartext) traffic for local ESP32 devices
-      // Required because ESP32 uses HTTP, not HTTPS
       usesCleartextTraffic: true,
     },
     // Disable dev menu in production builds

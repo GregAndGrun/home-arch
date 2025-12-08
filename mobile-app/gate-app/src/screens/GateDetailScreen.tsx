@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,14 +28,13 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   onBack,
 }) => {
   const { colors } = useTheme();
-  const [gateState] = useState<GateState>(GateState.UNKNOWN);
   const [refreshing, setRefreshing] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [todayActivities, setTodayActivities] = useState<number[]>([]);
   const [hasRealActivities, setHasRealActivities] = useState(false);
 
-  const getGateName = (): string => {
+  const gateName = useMemo(() => {
     switch (gateType) {
       case GateType.GARAGE:
         return 'Garaż';
@@ -48,9 +47,10 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       default:
         return 'Brama';
     }
-  };
+  }, [gateType]);
 
-  const gateName = getGateName();
+  const gateTypeRef = useRef(gateType);
+  gateTypeRef.current = gateType;
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -62,7 +62,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     return () => {
       unsubscribe();
     };
-  }, [gateType, loadTodayActivities]);
+  }, [loadTodayActivities]);
 
   const loadTodayActivities = useCallback(async () => {
     try {
@@ -187,7 +187,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       >
         <View style={styles.controlWrapper}>
           <CircularGateControl
-            state={gateState}
+            state={GateState.UNKNOWN}
             onToggle={handleTrigger}
             loading={triggering}
             disabled={!isConnected}

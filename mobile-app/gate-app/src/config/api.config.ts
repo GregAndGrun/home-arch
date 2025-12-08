@@ -5,31 +5,17 @@ import Constants from 'expo-constants';
 // These values come from .env file (see .env.example for template)
 const extra = Constants.expoConfig?.extra || {};
 
-// Log configuration for debugging
-console.log('[api.config] Loading configuration from expo-constants:', {
-  gateEntranceIp: extra.gateEntranceIp,
-  gateGarageIp: extra.gateGarageIp,
-  gateEntrancePort: extra.gateEntrancePort,
-  gateGaragePort: extra.gateGaragePort,
-});
-
 // Default ESP32 IP addresses (loaded from .env or fallback to defaults)
 export const DEFAULT_GATE_ENTRANCE_IP = extra.gateEntranceIp || '192.168.1.100';
 export const DEFAULT_GATE_GARAGE_IP = extra.gateGarageIp || '192.168.0.103';
 export const DEFAULT_GATE_ENTRANCE_PORT = extra.gateEntrancePort || '80';
 export const DEFAULT_GATE_GARAGE_PORT = extra.gateGaragePort || '80';
 
-console.log('[api.config] Final configuration:', {
-  DEFAULT_GATE_ENTRANCE_IP,
-  DEFAULT_GATE_GARAGE_IP,
-  DEFAULT_GATE_ENTRANCE_PORT,
-  DEFAULT_GATE_GARAGE_PORT,
-});
-
 // API endpoints
 export const API_ENDPOINTS = {
   LOGIN: '/api/auth/login',
   LOGOUT: '/api/auth/logout',
+  CHANGE_PASSWORD: '/api/auth/change-password',
   GATES_STATUS: '/api/gates/status',
   GATE_ENTRANCE_TRIGGER: '/api/gates/entrance/trigger',
   GATE_ENTRANCE_OPEN: '/api/gates/entrance/open',

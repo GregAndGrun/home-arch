@@ -53,39 +53,36 @@ const VpnStatusBanner: React.FC<Props> = ({ status, message, onRetry }) => {
           const wireguardPackage = 'com.wireguard.android';
           const wireguardIntent = `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;component=${wireguardPackage}/.ui.MainActivity;end`;
           await Linking.openURL(wireguardIntent);
-          console.log('[VpnStatusBanner] WireGuard app opened via intent');
           setTimeout(() => {
             setIsOpeningVpn(false);
           }, 500);
           return;
         } catch (intentError) {
-          console.log('[VpnStatusBanner] WireGuard intent failed, trying deep link:', intentError);
+          // Intent failed, try deep link
         }
         
         // Method 2: Try WireGuard deep link
         try {
           const wireguardUrl = `wireguard://activate?tunnel=${encodeURIComponent(WIREGUARD_TUNNEL_NAME)}`;
           await Linking.openURL(wireguardUrl);
-          console.log('[VpnStatusBanner] WireGuard deep link opened');
           setTimeout(() => {
             setIsOpeningVpn(false);
           }, 500);
           return;
         } catch (deepLinkError) {
-          console.log('[VpnStatusBanner] WireGuard deep link failed:', deepLinkError);
+          // Deep link failed
         }
       } else {
         // On iOS, try WireGuard deep link
         try {
           const wireguardUrl = `wireguard://activate?tunnel=${encodeURIComponent(WIREGUARD_TUNNEL_NAME)}`;
           await Linking.openURL(wireguardUrl);
-          console.log('[VpnStatusBanner] WireGuard deep link opened (iOS)');
           setTimeout(() => {
             setIsOpeningVpn(false);
           }, 500);
           return;
         } catch (deepLinkError) {
-          console.log('[VpnStatusBanner] WireGuard deep link failed (iOS):', deepLinkError);
+          // Deep link failed
         }
       }
       
@@ -96,43 +93,31 @@ const VpnStatusBanner: React.FC<Props> = ({ status, message, onRetry }) => {
           // Method 1: Intent URI for VPN settings (most reliable)
           const vpnIntentUrl = 'intent:#Intent;action=android.settings.VPN_SETTINGS;end';
           await Linking.openURL(vpnIntentUrl);
-          console.log('[VpnStatusBanner] VPN settings opened via intent URI');
           return;
         } catch (intentError) {
-          console.log('[VpnStatusBanner] Intent URI failed, trying alternative method:', intentError);
-          
           try {
             // Method 2: Alternative intent format
             const vpnIntentUrl2 = 'intent://settings/vpn#Intent;scheme=android.settings;action=android.settings.VPN_SETTINGS;end';
             await Linking.openURL(vpnIntentUrl2);
-            console.log('[VpnStatusBanner] VPN settings opened via alternative intent');
             return;
           } catch (intentError2) {
-            console.log('[VpnStatusBanner] Alternative intent failed, trying system settings:', intentError2);
-            
             try {
               // Method 3: Open system settings (not app settings)
-              // This opens Android system settings where user can navigate to VPN
               await Linking.openURL('android.settings.SETTINGS');
-              console.log('[VpnStatusBanner] System settings opened');
               return;
             } catch (systemError) {
-              console.warn('[VpnStatusBanner] System settings failed:', systemError);
+              // System settings failed
             }
           }
         }
         
-        // Final fallback: open app settings (not ideal, but better than nothing)
-        console.log('[VpnStatusBanner] All methods failed, falling back to app settings');
+        // Final fallback: open app settings
         await Linking.openSettings();
       } else {
         // On iOS, open system settings (not app settings) for VPN
         try {
-          // On iOS, we can try to open system settings directly
           await Linking.openURL('App-Prefs:root=General&path=VPN');
-          console.log('[VpnStatusBanner] iOS VPN settings opened');
         } catch (iosError) {
-          console.log('[VpnStatusBanner] iOS VPN settings failed, opening general settings:', iosError);
           // Fallback to general settings
           await Linking.openSettings();
         }
@@ -143,7 +128,7 @@ const VpnStatusBanner: React.FC<Props> = ({ status, message, onRetry }) => {
       try {
         await Linking.openSettings();
       } catch (settingsError) {
-        console.warn('[VpnStatusBanner] Cannot open settings:', settingsError);
+        // Settings failed
       }
     } finally {
       setIsOpeningVpn(false);
