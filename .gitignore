@@ -8,6 +8,9 @@ firmware/gate-controller/src/secrets.h
 *.key
 *.crt
 *.p12
+# Certificate data (contains private keys)
+firmware/gate-controller/src/CertificateData.h
+**/CertificateData.h
 
 # ESP32 / PlatformIO
 .pio/
