@@ -5,7 +5,7 @@ module.exports = {
     expo: {
     name: 'Smart Home',
     slug: 'smart-home',
-    version: '1.0.2',
+    version: '1.0.3',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -20,7 +20,7 @@ module.exports = {
       bundleIdentifier: 'com.grunert.smarthome',
       supportsTablet: true,
       jsEngine: 'hermes', // Enable Hermes for better performance and DevTools support
-      buildNumber: '3', // Increment for each App Store submission
+      buildNumber: '4', // Increment for each App Store submission
       infoPlist: {
         // Notification permissions are handled by expo-notifications
       },

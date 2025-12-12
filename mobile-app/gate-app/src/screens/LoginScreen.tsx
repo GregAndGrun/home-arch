@@ -20,6 +20,8 @@ import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { hexToRgba, generateGradient } from '../theme/colors';
 import Logo from '../components/Logo';
+import VpnStatusBanner from '../components/VpnStatusBanner';
+import { useGatewayReachability } from '../hooks/useGatewayReachability';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -34,6 +36,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+  const { status: gatewayStatus, message: gatewayMessage, refresh: refreshGatewayStatus } =
+    useGatewayReachability();
 
   const checkBiometrics = async () => {
     if (Platform.OS === 'web') {
@@ -160,6 +164,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
+      <VpnStatusBanner
+        status={gatewayStatus}
+        message={gatewayMessage}
+        onRetry={refreshGatewayStatus}
+      />
       <ImageBackground
         source={{ uri: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80' }}
         style={styles.backgroundImage}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -188,7 +188,7 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
   };
 
 
-  const HeaderContent = (
+  const HeaderContent = useMemo(() => (
     <View>
       <View style={styles.headerTopRow}>
         <View>
@@ -205,7 +205,7 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
         onSelectCategory={setSelectedCategory}
       />
     </View>
-  );
+  ), [username, selectedCategory]);
 
   return (
     <SplitScreen headerContent={HeaderContent}>
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
     marginTop: 15,
-    marginBottom: 15,
+    marginBottom: 8, // Reduced from 15 to move categories up
     paddingLeft: 30,
     paddingRight: 10,
   },

@@ -13,7 +13,7 @@ import StatsScreen from './src/screens/StatsScreen';
 import BiometricLockScreen from './src/screens/BiometricLockScreen';
 import BottomTabBar, { TabRoute } from './src/components/Navigation/BottomTabBar';
 import SwipeBackGesture from './src/components/Navigation/SwipeBackGesture';
-import VpnStatusBanner from './src/components/VpnStatusBanner';
+// VpnStatusBanner removed from global App - now only shown on LoginScreen and GateDetailScreen (garage only)
 import { StorageService } from './src/services/StorageService';
 import NotificationService from './src/services/NotificationService';
 import ActivityService from './src/services/ActivityService';
@@ -21,7 +21,7 @@ import { SmartDevice, GateType, DeviceCategory, DeviceType } from './src/types';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { useGatewayReachability } from './src/hooks/useGatewayReachability';
 
-type Screen = 'home' | 'gates' | 'gate-detail' | 'settings' | 'category-devices';
+type Screen = 'home' | 'gate-detail' | 'settings' | 'category-devices';
 
 function AppContent() {
   const { colors } = useTheme();
@@ -39,8 +39,7 @@ function AppContent() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const [showAnimatedContent, setShowAnimatedContent] = useState(false);
-  const { status: gatewayStatus, message: gatewayMessage, refresh: refreshGatewayStatus } =
-    useGatewayReachability();
+  const { refresh: refreshGatewayStatus } = useGatewayReachability();
   
   // Refs for preventing state updates after unmount and debouncing
   const isMountedRef = useRef(true);
@@ -294,13 +293,8 @@ function AppContent() {
     
     // Save current screen and category before navigating
     setPreviousScreen(currentScreen);
-    // If we're on 'gates' screen, save 'gates' as previous category
-    // If we're on 'category-devices' screen, save the current selectedCategory
-    if (currentScreen === 'gates') {
-      setPreviousCategory('gates');
-    } else {
-      setPreviousCategory(selectedCategory);
-    }
+    // Save the current selectedCategory (all categories now use category-devices screen)
+    setPreviousCategory(selectedCategory);
     
     // Handle gates and blinds - navigate to appropriate gate detail screen
     if (device.type === DeviceType.GATE || device.type === DeviceType.BLINDS) {
@@ -312,27 +306,20 @@ function AppContent() {
   };
 
   const handleCategoryPress = (category: DeviceCategory | 'all') => {
-    // For 'all', show all devices in CategoryDevicesScreen
+    // For all categories including 'gates', use CategoryDevicesScreen for consistency
     if (category === 'all') {
       setSelectedCategory('all');
-      setCurrentScreen('category-devices');
-      return;
-    }
-    
-    // For gates, go directly to GatesScreen instead of CategoryDevicesScreen
-    if (category === 'gates') {
-      setCurrentScreen('gates');
     } else {
       setSelectedCategory(category);
-      setCurrentScreen('category-devices');
     }
+    setCurrentScreen('category-devices');
   };
 
   const handleGatePress = (gateType: GateType) => {
     // Save current screen and category before navigating
     setPreviousScreen(currentScreen);
-    // We're on 'gates' screen, so save 'gates' as previous category
-    setPreviousCategory('gates');
+    // Save the current selectedCategory (all categories now use category-devices screen)
+    setPreviousCategory(selectedCategory || 'gates');
     
     setSelectedGateType(gateType);
     setCurrentScreen('gate-detail');
@@ -351,14 +338,13 @@ function AppContent() {
         setPreviousScreen(null);
         setPreviousCategory(null);
       } else {
-        // Fallback to gates screen
-        setCurrentScreen('gates');
-        setSelectedCategory('gates');
+        // Fallback to category-devices with previous category or 'all'
+        setCurrentScreen('category-devices');
+        setSelectedCategory(previousCategory || 'all');
+        setPreviousScreen(null);
+        setPreviousCategory(null);
       }
       setSelectedGateType(null);
-    } else if (currentScreen === 'gates') {
-      setCurrentScreen('home');
-      setSelectedCategory(null);
     } else if (currentScreen === 'category-devices') {
       setCurrentScreen('home');
       setSelectedCategory(null);
@@ -481,34 +467,16 @@ function AppContent() {
               onDevicePress={handleDevicePress}
               onCategorySelect={(category) => {
                 if (category === 'all') {
-                  setSelectedCategory(null);
-                  // Stay on category-devices to show all devices
-                } else if (category === 'gates') {
-                  setCurrentScreen('gates');
+                  setSelectedCategory('all');
                 } else {
                   setSelectedCategory(category as DeviceCategory);
                 }
+                // Stay on category-devices screen for all categories
               }}
             />
           </SwipeBackGesture>
         );
-      case 'gates':
-        return (
-          <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
-            <GatesScreen
-              onGatePress={handleGatePress}
-              onCategorySelect={(category) => {
-                if (category === 'all') {
-                  setCurrentScreen('home');
-                } else if (category !== 'gates') {
-                  // Navigate to other category
-                  setSelectedCategory(category as DeviceCategory);
-                  setCurrentScreen('category-devices');
-                }
-              }}
-            />
-          </SwipeBackGesture>
-        );
+      // Removed 'gates' case - now using CategoryDevicesScreen for all categories
       case 'gate-detail':
         return selectedGateType ? (
           <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
@@ -541,11 +509,6 @@ function AppContent() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="auto" />
-      <VpnStatusBanner
-        status={gatewayStatus}
-        message={gatewayMessage}
-        onRetry={refreshGatewayStatus}
-      />
       {showLoginForAction ? (
         <LoginScreen onLoginSuccess={handleLoginSuccess} />
       ) : (

@@ -41,10 +41,13 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
   const [actionLoading, setActionLoading] = useState<'open' | 'close' | 'stop' | null>(null);
   const positionAnim = React.useRef(new Animated.Value(currentPosition >= 0 ? currentPosition : 50)).current;
   const [isDragging, setIsDragging] = useState(false);
+  const [dragPercentage, setDragPercentage] = useState<number>(0); // Current percentage during drag
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const blindsFrameRef = React.useRef<View>(null);
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const pendingPositionRef = React.useRef<number | null>(null);
+  const dragIndicatorOpacity = React.useRef(new Animated.Value(0)).current;
+  const dragIndicatorScale = React.useRef(new Animated.Value(0.8)).current;
   
   const BLINDS_HEIGHT = 200;
   const SLAT_COUNT = 12; // Liczba pasków żaluzji
@@ -87,6 +90,38 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
       onDragStateChange(isDragging);
     }
   }, [isDragging, onDragStateChange]);
+
+  // Animate drag indicator when dragging starts/stops
+  useEffect(() => {
+    if (isDragging) {
+      Animated.parallel([
+        Animated.timing(dragIndicatorOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(dragIndicatorScale, {
+          toValue: 1,
+          friction: 4,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(dragIndicatorOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dragIndicatorScale, {
+          toValue: 0.8,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isDragging, dragIndicatorOpacity, dragIndicatorScale]);
 
   // Create position display for header (empty now - moved to main content)
   useEffect(() => {
@@ -313,6 +348,9 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
           // Top (0) = 0% closed (open), bottom (frameHeight) = 100% closed
           const percentage = Math.round((clampedY / frameHeight) * 100);
           
+          // Update drag percentage for indicator
+          setDragPercentage(percentage);
+          
           if (mockMode) {
             setMockPosition(percentage);
           } else {
@@ -339,6 +377,9 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
         const clampedY = Math.max(0, Math.min(frameHeight, relativeY));
         // Top (0) = 0% closed (open), bottom (frameHeight) = 100% closed
         const percentage = Math.round((clampedY / frameHeight) * 100);
+        
+        // Update drag percentage for indicator
+        setDragPercentage(percentage);
         
         console.log('[BlindsControl] onPanResponderMove:', {
           pageY,
@@ -393,6 +434,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
         // Reset dragging state
         isDraggingRef.current = false;
         setIsDragging(false);
+        setDragPercentage(0); // Reset drag percentage
         
         // Re-enable parent ScrollView scrolling
         if (onDragStateChange) {
@@ -422,6 +464,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
       onPanResponderTerminate: () => {
         isDraggingRef.current = false;
         setIsDragging(false);
+        setDragPercentage(0); // Reset drag percentage
         // Re-enable parent ScrollView scrolling
         if (onDragStateChange) {
           onDragStateChange(false);
@@ -584,6 +627,23 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
               },
             ]}
           />
+
+          {/* Drag percentage indicator - shown during dragging */}
+          <Animated.View
+            style={[
+              styles.dragPercentageIndicator,
+              {
+                opacity: dragIndicatorOpacity,
+                transform: [{ scale: dragIndicatorScale }],
+                backgroundColor: colors.accent + 'E6',
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={[styles.dragPercentageText, { color: '#FFFFFF' }]}>
+              {dragPercentage}%
+            </Text>
+          </Animated.View>
         </View>
 
         {/* Position labels on the right - reversed (0% top, 100% bottom) */}
@@ -729,7 +789,7 @@ const styles = StyleSheet.create({
   mainControlArea: {
     flexDirection: 'row',
     borderRadius: 24,
-    padding: 24,
+    padding: 32, // Increased from 24 to 32 for better touch area
     marginBottom: 20,
     elevation: 4,
     shadowColor: '#000',
@@ -803,6 +863,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderTopColor: 'rgba(255, 255, 255, 0.3)',
     borderBottomColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  dragPercentageIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -25,
+    marginLeft: -40,
+    width: 80,
+    height: 50,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  dragPercentageText: {
+    fontSize: 24,
+    fontFamily: typography.fontFamily.bold,
+    fontWeight: 'bold',
   },
   positionLabels: {
     width: 55,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -50,7 +50,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onCategoryPress, onLogout }) =>
     setTimeout(() => setRefreshing(false), 500);
   };
 
-  const HeaderContent = (
+  const HeaderContent = useMemo(() => (
     <View>
       <View style={styles.headerTopRow}>
         <View>
@@ -67,7 +67,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onCategoryPress, onLogout }) =>
         onSelectCategory={setSelectedCategory}
       />
     </View>
-  );
+  ), [username, selectedCategory]);
 
   return (
     <SplitScreen 
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
     marginTop: 15,
-    marginBottom: 15,
+    marginBottom: 8, // Reduced from 15 to move categories up
     paddingLeft: 30,
     paddingRight: 10,
   },

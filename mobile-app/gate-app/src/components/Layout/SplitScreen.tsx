@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, memo } from 'react';
 import { View, Text, StyleSheet, Platform, Animated, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -25,22 +25,24 @@ const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerConte
   }, [accentColor]);
 
   // Animacje tylko dla contentu (nie dla headera!)
-  const contentFadeAnim = useRef(new Animated.Value(0)).current;
+  // Start with opacity 1 to prevent flickering
+  const contentFadeAnim = useRef(new Animated.Value(1)).current;
   
   // Animacja ikonki przy przełączaniu stron
   const iconScaleAnim = useRef(new Animated.Value(1)).current;
   const iconRotationAnim = useRef(new Animated.Value(0)).current;
   const iconOpacityAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    // Animacja tylko dla contentu
-    Animated.timing(contentFadeAnim, {
-      toValue: 1,
-      duration: 300,
-      delay: 200,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  // Remove initial fade-in animation to prevent flickering
+  // useEffect(() => {
+  //   // Animacja tylko dla contentu
+  //   Animated.timing(contentFadeAnim, {
+  //     toValue: 1,
+  //     duration: 300,
+  //     delay: 200,
+  //     useNativeDriver: true,
+  //   }).start();
+  // }, []);
 
   // Animacja ikonki przy zmianie titleIcon
   useEffect(() => {
@@ -75,9 +77,9 @@ const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerConte
 
   const handleHeaderLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
-    // Wymuś stałą wysokość 250px jeśli się zmieniła
-    if (headerRef.current && Math.abs(height - 250) > 0.5) {
-      headerRef.current.setNativeProps({ style: { height: 250, minHeight: 250, maxHeight: 250 } });
+    // Wymuś stałą wysokość 240px jeśli się zmieniła
+    if (headerRef.current && Math.abs(height - 240) > 0.5) {
+      headerRef.current.setNativeProps({ style: { height: 240, minHeight: 240, maxHeight: 240 } });
     }
   };
 
@@ -176,9 +178,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    height: 250,
-    minHeight: 250,
-    maxHeight: 250,
+    height: 240, // Increased slightly (from 225)
+    minHeight: 240,
+    maxHeight: 240,
     width: '100%',
     paddingHorizontal: 20,
     position: 'absolute',
@@ -199,7 +201,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingTop: 20,
-    height: 250,
+    height: 240, // Increased slightly (from 225)
     overflow: 'hidden',
   },
   headerContentWrapper: {
@@ -252,7 +254,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginTop: 250,
+    marginTop: 240, // Increased slightly (from 225)
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     overflow: 'hidden',
@@ -260,5 +262,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SplitScreen;
+export default memo(SplitScreen);
 

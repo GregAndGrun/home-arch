@@ -15,9 +15,9 @@ const SwipeBackGesture: React.FC<SwipeBackGestureProps> = ({
 }) => {
   const { colors } = useTheme();
   const screenWidth = Dimensions.get('window').width;
-  const SWIPE_THRESHOLD = screenWidth * 0.25; // 25% of screen width
-  const EDGE_THRESHOLD = 20; // 20px from left edge
-  const VELOCITY_THRESHOLD = 0.3; // Minimum velocity for swipe
+  const SWIPE_THRESHOLD = screenWidth * 0.15; // 15% of screen width (more sensitive)
+  const EDGE_THRESHOLD = 30; // 30px from left edge (more forgiving)
+  const VELOCITY_THRESHOLD = 0.2; // Minimum velocity for swipe (more sensitive)
   const startXRef = useRef<number | null>(null);
 
   const panResponder = useRef(

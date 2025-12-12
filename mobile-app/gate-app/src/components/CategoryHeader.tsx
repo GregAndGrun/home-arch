@@ -74,14 +74,21 @@ const AnimatedCategoryItem: React.FC<{
 const CategoryHeader: React.FC<CategoryHeaderProps> = ({ selectedCategory, onSelectCategory }) => {
   const { colors } = useTheme();
   const scrollViewRef = useRef<ScrollView>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  // Start with opacity 1 to prevent flickering
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const hasAnimatedRef = useRef(false);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    // Only animate on first mount, not on every render
+    if (!hasAnimatedRef.current) {
+      hasAnimatedRef.current = true;
+      fadeAnim.setValue(0);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
   }, []);
 
   return (
@@ -96,6 +103,8 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ selectedCategory, onSel
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
         }}
+        removeClippedSubviews={false}
+        collapsable={false}
       >
         {categories.map((cat, index) => (
           <AnimatedCategoryItem
@@ -113,7 +122,7 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ selectedCategory, onSel
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 15,
+    marginTop: 8, // Reduced from 15 to move categories up
   },
   scrollContent: {
     paddingLeft: 30,

@@ -15,9 +15,11 @@ import NetInfo from '@react-native-community/netinfo';
 import SplitScreen from '../components/Layout/SplitScreen';
 import CircularGateControl from '../components/CircularGateControl';
 import BlindsControl from '../components/BlindsControl';
+import VpnStatusBanner from '../components/VpnStatusBanner';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useGatewayReachability } from '../hooks/useGatewayReachability';
 
 interface GateDetailScreenProps {
   gateType: GateType;
@@ -31,6 +33,8 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   onAuthRequired,
 }) => {
   const { colors } = useTheme();
+  const { status: gatewayStatus, message: gatewayMessage, refresh: refreshGatewayStatus } =
+    useGatewayReachability();
   const [refreshing, setRefreshing] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
@@ -435,8 +439,18 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     return undefined;
   };
 
+  // Show VPN banner only for garage gate
+  const showVpnBanner = gateType === GateType.GARAGE;
+
   return (
     <SplitScreen title={gateName} titleIcon={getTitleIcon()} onBack={onBack} headerContent={headerContent}>
+      {showVpnBanner && (
+        <VpnStatusBanner
+          status={gatewayStatus}
+          message={gatewayMessage}
+          onRetry={refreshGatewayStatus}
+        />
+      )}
       <ScrollView
         contentContainerStyle={styles.contentContainer}
         scrollEnabled={!isDraggingBlinds}
