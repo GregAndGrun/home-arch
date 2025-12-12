@@ -524,6 +524,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
               currentPosition={blindsPosition}
               direction={blindsDirection}
               mockMode={false}
+              gateType={gateType}
             />
           ) : (
             <CircularGateControl

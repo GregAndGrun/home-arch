@@ -4,6 +4,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
+import { GateType } from '../types';
+import { generateGradient, hexToRgba } from '../theme/colors';
 
 interface BlindsControlProps {
   onOpen: () => Promise<void>;
@@ -19,6 +21,7 @@ interface BlindsControlProps {
   onDragStateChange?: (isDragging: boolean) => void; // Callback to notify parent about drag state
   onDragPercentageChange?: (percentage: number) => void; // Callback to notify parent about current percentage during drag
   mockMode?: boolean; // Mock mode for testing design without API calls
+  gateType?: GateType; // Gate type to determine window style (fix vs taras)
 }
 
 const BlindsControl: React.FC<BlindsControlProps> = ({
@@ -35,6 +38,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
   onDragStateChange,
   onDragPercentageChange,
   mockMode = false,
+  gateType,
 }) => {
   const { colors, accentColor } = useTheme();
   const [sliderValue, setSliderValue] = useState(currentPosition >= 0 ? currentPosition : 50);
@@ -42,6 +46,17 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
   const [isMoving, setIsMoving] = useState(direction !== 0);
   const [actionLoading, setActionLoading] = useState<'open' | 'close' | 'stop' | null>(null);
   const positionAnim = React.useRef(new Animated.Value(currentPosition >= 0 ? currentPosition : 50)).current;
+  
+  // Determine time of day for window background
+  const getTimeOfDay = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 10) return 'morning'; // 5-10
+    if (hour >= 10 && hour < 15) return 'noon'; // 10-15
+    if (hour >= 15 && hour < 19) return 'afternoon'; // 15-19
+    return 'evening'; // 19-5
+  };
+  
+  const timeOfDay = getTimeOfDay();
   const [isDragging, setIsDragging] = useState(false);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const blindsFrameRef = React.useRef<View>(null);
@@ -584,28 +599,120 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
             setTouchStartY(pageY);
           }}
         >
-          {/* Closed part from top with gradient */}
+          {/* Window background - sky, sun/moon, clouds, stars */}
+          <View style={styles.windowBackground}>
+            {/* Sky gradient - changes based on time of day */}
+            <LinearGradient
+              colors={
+                timeOfDay === 'morning' 
+                  ? ['#87CEEB', '#B0E0E6', '#E0F6FF'] // Soft morning blue
+                  : timeOfDay === 'noon'
+                  ? ['#4A90E2', '#87CEEB', '#DDEEFF'] // Clear bright blue sky
+                  : timeOfDay === 'afternoon'
+                  ? ['#FF7F50', '#FFA07A', '#FFD4A3'] // Warm coral sunset
+                  : ['#0F1419', '#1A2332', '#253447'] // Deep navy night
+              }
+              style={StyleSheet.absoluteFill}
+            />
+            
+            {/* Sun/Moon - changes based on time of day with better positioning */}
+            {timeOfDay === 'morning' ? (
+              <View style={[styles.sun, { top: 40, right: 35, backgroundColor: '#FFD700', shadowColor: '#FFD700' }]} />
+            ) : timeOfDay === 'noon' ? (
+              <View style={[styles.sun, { top: 20, right: '45%', backgroundColor: '#FFA500', shadowColor: '#FFA500' }]} />
+            ) : timeOfDay === 'afternoon' ? (
+              <View style={[styles.sun, { top: 50, left: 30, backgroundColor: '#FF4500', shadowColor: '#FF4500', opacity: 0.8 }]} />
+            ) : (
+              <View style={[styles.moon, { top: 30, right: 40 }]}>
+                <View style={styles.moonCrater1} />
+                <View style={styles.moonCrater2} />
+              </View>
+            )}
+            
+            {/* Clouds - only during day, varies by time */}
+            {timeOfDay === 'morning' && (
+              <>
+                <View style={[styles.cloud1, { backgroundColor: 'rgba(255, 182, 193, 0.5)' }]} />
+                <View style={[styles.cloud2, { backgroundColor: 'rgba(255, 218, 185, 0.6)' }]} />
+              </>
+            )}
+            {timeOfDay === 'noon' && (
+              <>
+                <View style={styles.cloud1} />
+                <View style={styles.cloud2} />
+                <View style={styles.cloud3} />
+              </>
+            )}
+            {timeOfDay === 'afternoon' && (
+              <>
+                <View style={[styles.cloud1, { backgroundColor: 'rgba(255, 140, 0, 0.3)' }]} />
+                <View style={[styles.cloud3, { backgroundColor: 'rgba(255, 165, 0, 0.4)' }]} />
+              </>
+            )}
+            
+            {/* Stars - only during evening, more visible */}
+            {timeOfDay === 'evening' && (
+              <>
+                <View style={styles.star1} />
+                <View style={styles.star2} />
+                <View style={styles.star3} />
+                <View style={styles.star4} />
+                <View style={styles.star5} />
+                <View style={styles.star6} />
+              </>
+            )}
+          </View>
+          
+          {/* Sunlight effect from top - only on open parts */}
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.08)', 'transparent']}
+            style={[StyleSheet.absoluteFill, { height: BLINDS_HEIGHT * 0.4 }]}
+            pointerEvents="none"
+          />
+          
+          {/* Double window - vertical divider in the middle */}
+          <View style={styles.windowDivider} />
+          
+          {/* Window frame overlay effect - white frame */}
+          <View style={styles.windowFrame} />
+          
+          {/* Handle for taras (terrace) - only show for LIVING_ROOM_TERRACE, centered */}
+          {gateType === GateType.LIVING_ROOM_TERRACE && (
+            <View style={styles.windowHandleCentered} />
+          )}
+
+          {/* Closed part from top with realistic material gradient */} 
           <Animated.View
             style={[
-              styles.blindsClosedArea,
+              styles.blindsClosedArea, 
               {
                 height: closedHeight,
               },
             ]}
           >
             <LinearGradient
-              colors={[colors.accent + 'DD', colors.accent + 'AA', colors.accent + '88']}
+              colors={[
+                colors.accent + 'F0', // Top - more opaque
+                colors.accent + 'D8', // Middle
+                colors.accent + 'C0', // Bottom - slightly lighter
+              ]}
               style={StyleSheet.absoluteFill}
             />
+            {/* Material texture overlay for closed area */}
+            <View style={styles.materialTexture} />
           </Animated.View>
 
-          {/* Interactive horizontal slats */}
+          {/* Interactive horizontal slats with realistic 3D effect - only show closed slats */}
           {Array.from({ length: SLAT_COUNT }).map((_, index) => {
             const slatHeight = BLINDS_HEIGHT / SLAT_COUNT;
             const slatTop = index * slatHeight;
             const closedHeight = (effectivePosition / 100) * BLINDS_HEIGHT;
             const slatClosed = slatTop < closedHeight;
-            const isNearClosed = Math.abs(slatTop - closedHeight) < slatHeight;
+            
+            // Only render slats that are closed (or very close to closed)
+            if (!slatClosed) {
+              return null;
+            }
             
             return (
               <View
@@ -614,25 +721,39 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
                   styles.blindSlat,
                   {
                     top: slatTop,
-                    backgroundColor: slatClosed 
-                      ? colors.accent + 'E6' 
-                      : isNearClosed 
-                        ? colors.accent + '50' 
-                        : colors.accent + '25',
-                    borderTopColor: slatClosed ? colors.accent + 'FF' : colors.accent + '60',
-                    borderBottomColor: slatClosed ? colors.accent + 'CC' : colors.accent + '40',
+                    backgroundColor: colors.accent + 'E8',
+                    borderTopColor: colors.accent + 'FF',
+                    borderBottomColor: colors.accent + 'CC',
+                    shadowOpacity: 0.2,
                   },
                 ]}
                 pointerEvents="none"
               >
+                {/* Main slat body with 3D effect */}
+                <LinearGradient
+                  colors={[
+                    colors.accent + 'FF', // Top highlight
+                    colors.accent + 'E8', // Middle
+                    colors.accent + 'D0', // Bottom shadow
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.slatGradient}
+                />
+                
+                {/* Slat highlight for 3D depth */}
                 <View style={[
-                  styles.slatContent, 
-                  { 
-                    backgroundColor: slatClosed 
-                      ? colors.accent + 'FF' 
-                      : colors.accent + '30',
-                    opacity: slatClosed ? 1 : 0.4,
-                    borderRadius: 2,
+                  styles.slatHighlight,
+                  {
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  }
+                ]} />
+                
+                {/* Slat shadow for depth */}
+                <View style={[
+                  styles.slatShadow,
+                  {
+                    backgroundColor: 'rgba(0, 0, 0, 0.1)',
                   }
                 ]} />
               </View>
@@ -662,69 +783,93 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
         </View>
       </View>
 
-      {/* Control Buttons - Header Style */}
+      {/* Control Buttons - Modern Style */}
       <View style={styles.buttonsContainer}>
         <TouchableOpacity
           style={[
             styles.button,
-            styles.headerStyleButton,
-            { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
             isButtonDisabled && styles.buttonDisabled,
           ]}
           onPress={handleOpen}
           disabled={isButtonDisabled}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          {actionLoading === 'open' ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <MaterialIcons name="keyboard-arrow-up" size={24} color="#FFFFFF" style={{ opacity: 0.9 }} />
-              <Text style={styles.headerButtonText}>Otwórz</Text>
-            </>
-          )}
+          <LinearGradient
+            colors={isButtonDisabled 
+              ? [hexToRgba(colors.accent, 0.3), hexToRgba(colors.accent, 0.2)]
+              : generateGradient(colors.accent)
+            }
+            style={styles.buttonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {actionLoading === 'open' ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <MaterialIcons name="keyboard-arrow-up" size={22} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Otwórz</Text>
+              </>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.button,
-            styles.headerStyleButton,
-            { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
             isButtonDisabled && styles.buttonDisabled,
           ]}
           onPress={handleStop}
           disabled={isButtonDisabled}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          {actionLoading === 'stop' ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <MaterialIcons name="stop" size={24} color="#FFFFFF" style={{ opacity: 0.9 }} />
-              <Text style={styles.headerButtonText}>Stop</Text>
-            </>
-          )}
+          <LinearGradient
+            colors={isButtonDisabled 
+              ? [hexToRgba(colors.textSecondary, 0.3), hexToRgba(colors.textSecondary, 0.2)]
+              : [hexToRgba(colors.textSecondary, 0.4), hexToRgba(colors.textSecondary, 0.3)]
+            }
+            style={styles.buttonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {actionLoading === 'stop' ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <MaterialIcons name="stop" size={22} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Stop</Text>
+              </>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.button,
-            styles.headerStyleButton,
-            { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
             isButtonDisabled && styles.buttonDisabled,
           ]}
           onPress={handleClose}
           disabled={isButtonDisabled}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
-          {actionLoading === 'close' ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <MaterialIcons name="keyboard-arrow-down" size={24} color="#FFFFFF" style={{ opacity: 0.9 }} />
-              <Text style={styles.headerButtonText}>Zamknij</Text>
-            </>
-          )}
+          <LinearGradient
+            colors={isButtonDisabled 
+              ? [hexToRgba(colors.accent, 0.3), hexToRgba(colors.accent, 0.2)]
+              : generateGradient(colors.accent)
+            }
+            style={styles.buttonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {actionLoading === 'close' ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <MaterialIcons name="keyboard-arrow-down" size={22} color="#FFFFFF" />
+                <Text style={styles.buttonText}>Zamknij</Text>
+              </>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -792,6 +937,209 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
+  windowBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  sun: {
+    position: 'absolute',
+    top: 20,
+    right: 30,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFD700',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  cloud1: {
+    position: 'absolute',
+    top: 25,
+    left: 20,
+    width: 35,
+    height: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  cloud2: {
+    position: 'absolute',
+    top: 30,
+    left: 50,
+    width: 45,
+    height: 25,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  },
+  cloud3: {
+    position: 'absolute',
+    top: 35,
+    right: 20,
+    width: 30,
+    height: 18,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+  },
+  star1: {
+    position: 'absolute',
+    top: 30,
+    left: 30,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#FFFFFF',
+  },
+  star2: {
+    position: 'absolute',
+    top: 40,
+    right: 40,
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  star3: {
+    position: 'absolute',
+    top: 50,
+    left: '45%',
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.25,
+    backgroundColor: '#FFFFFF',
+  },
+  star4: {
+    position: 'absolute',
+    top: 60,
+    right: 50,
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  star5: {
+    position: 'absolute',
+    top: 45,
+    left: '60%',
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 1.25,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.8,
+  },
+  star6: {
+    position: 'absolute',
+    top: 70,
+    left: '25%',
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.9,
+  },
+  moon: {
+    position: 'absolute',
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+    backgroundColor: '#F0E68C',
+    shadowColor: '#F0E68C',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  moonCrater1: {
+    position: 'absolute',
+    top: 8,
+    left: 10,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#E6D68A',
+  },
+  moonCrater2: {
+    position: 'absolute',
+    bottom: 10,
+    right: 8,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#E6D68A',
+  },
+  windowFrame: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 8,
+    borderColor: '#FFFFFF', // White frame
+    borderRadius: 16,
+    pointerEvents: 'none',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  windowDivider: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '50%',
+    width: 6,
+    marginLeft: -3, // Center the divider
+    backgroundColor: '#FFFFFF', // White divider
+    shadowColor: '#000',
+    shadowOffset: { width: 1, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  windowHandle: {
+    position: 'absolute',
+    top: '50%',
+    right: 8,
+    width: 12,
+    height: 40,
+    marginTop: -20, // Center vertically
+    backgroundColor: '#C0C0C0', // Silver handle color
+    borderRadius: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+    // Handle grip details
+    borderWidth: 1,
+    borderColor: '#A0A0A0',
+  },
+  windowHandleCentered: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 8, // Narrower - handle shape
+    height: 50, // Longer - handle shape
+    marginTop: -25, // Center vertically
+    marginLeft: -4, // Center horizontally
+    backgroundColor: '#FFFFFF', // White handle
+    borderRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+    // Handle shape - curved ends
+    borderWidth: 0,
+  },
   blindsClosedArea: {
     position: 'absolute',
     top: 0,
@@ -800,11 +1148,21 @@ const styles = StyleSheet.create({
     width: '100%',
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
-    elevation: 1,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    overflow: 'hidden',
+  },
+  materialTexture: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    opacity: 0.15,
   },
   blindSlat: {
     position: 'absolute',
@@ -816,16 +1174,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 1,
-    elevation: 0.5,
+    elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    overflow: 'hidden',
   },
-  slatContent: {
-    width: '95%',
-    height: '55%',
-    borderRadius: 2,
+  slatGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  slatHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '30%',
+    borderTopLeftRadius: 1,
+    borderTopRightRadius: 1,
+  },
+  slatShadow: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '20%',
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 1,
   },
   blindsIndicatorLine: {
     position: 'absolute',
@@ -863,30 +1244,38 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    gap: 10,
+    marginBottom: 16,
+    gap: 12,
   },
   button: {
     flex: 1,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    minHeight: 64,
+  },
+  buttonGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 70,
-  },
-  headerStyleButton: {
-    // Styled via backgroundColor prop (rgba(255, 255, 255, 0.2))
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    gap: 6,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
+    elevation: 1,
+    shadowOpacity: 0.1,
   },
-  headerButtonText: {
+  buttonText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 13,
     fontFamily: typography.fontFamily.semiBold,
-    opacity: 0.9,
+    letterSpacing: 0.3,
   },
   statusIndicator: {
     flexDirection: 'row',
@@ -904,4 +1293,5 @@ const styles = StyleSheet.create({
 });
 
 export default BlindsControl;
+
 
