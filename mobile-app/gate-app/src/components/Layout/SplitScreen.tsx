@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     overflow: 'hidden',
-    paddingTop: 20,
+    paddingTop: 8,
   },
 });
 

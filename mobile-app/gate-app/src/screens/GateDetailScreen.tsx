@@ -45,10 +45,13 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   const [headerPositionDisplay, setHeaderPositionDisplay] = useState<React.ReactNode>(null);
   const [isDraggingBlinds, setIsDraggingBlinds] = useState(false);
   const [blindsDirection, setBlindsDirection] = useState<number>(0); // -1 = closing, 0 = stopped, 1 = opening
+  const [currentBlindsPercentage, setCurrentBlindsPercentage] = useState<number>(-1); // Current percentage for header display
+  const [gateTriggeredMessage, setGateTriggeredMessage] = useState(false); // Message for gate trigger
   const positionPollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastPositionRef = useRef<number>(-1);
   const lastPositionChangeTimeRef = useRef<number>(Date.now());
   const positionStableTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gateTriggeredTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isBlinds = gateType === GateType.LIVING_ROOM_FIX || gateType === GateType.LIVING_ROOM_TERRACE;
 
@@ -95,6 +98,11 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       if (positionStableTimeoutRef.current) {
         clearTimeout(positionStableTimeoutRef.current);
         positionStableTimeoutRef.current = null;
+      }
+      // Cleanup gate triggered timeout
+      if (gateTriggeredTimeoutRef.current) {
+        clearTimeout(gateTriggeredTimeoutRef.current);
+        gateTriggeredTimeoutRef.current = null;
       }
     };
   }, [isBlinds]);
@@ -195,6 +203,9 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       const currentPosition = status.position;
       const currentDirection = status.direction;
       
+      // Update current percentage for header display (always, even when not dragging)
+      setCurrentBlindsPercentage(currentPosition);
+      
       // Check if position is at limits (0% or 100%)
       const isAtLimit = currentPosition <= 1 || currentPosition >= 99;
       
@@ -276,6 +287,16 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     setTriggering(true);
     try {
       await ApiService.triggerGate(gateType);
+      // Show "Uruchomiono bramę" message
+      setGateTriggeredMessage(true);
+      // Clear existing timeout
+      if (gateTriggeredTimeoutRef.current) {
+        clearTimeout(gateTriggeredTimeoutRef.current);
+      }
+      // Hide message after 3 seconds
+      gateTriggeredTimeoutRef.current = setTimeout(() => {
+        setGateTriggeredMessage(false);
+      }, 3000);
       // Reload activities after successful trigger
       await loadTodayActivities();
       if (isBlinds) {
@@ -286,6 +307,13 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
         // Lazy authentication for ESP32 - retry after login
         onAuthRequired(async () => {
           await ApiService.triggerGate(gateType);
+          setGateTriggeredMessage(true);
+          if (gateTriggeredTimeoutRef.current) {
+            clearTimeout(gateTriggeredTimeoutRef.current);
+          }
+          gateTriggeredTimeoutRef.current = setTimeout(() => {
+            setGateTriggeredMessage(false);
+          }, 3000);
           await loadTodayActivities();
           if (isBlinds) {
             setTimeout(() => loadBlindsStatus(), 200);
@@ -429,7 +457,29 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     );
   };
 
-  const headerContent = isBlinds && headerPositionDisplay ? headerPositionDisplay : null;
+  // Create header content with percentage display for blinds or gate message
+  const headerContent = useMemo(() => {
+    if (isBlinds && currentBlindsPercentage >= 0) {
+      // Show percentage for blinds
+      return (
+        <View style={styles.headerPositionWrapper}>
+          <Text style={styles.headerPositionText}>
+            {Math.round(currentBlindsPercentage)}%
+          </Text>
+        </View>
+      );
+    } else if (!isBlinds && gateTriggeredMessage) {
+      // Show "Uruchomiono bramę" message for gates
+      return (
+        <View style={styles.headerPositionWrapper}>
+          <Text style={styles.headerGateMessageText}>
+            Uruchomiono bramę
+          </Text>
+        </View>
+      );
+    }
+    return null;
+  }, [isBlinds, currentBlindsPercentage, gateTriggeredMessage]);
 
   // Determine icon for header based on gate type
   const getTitleIcon = (): keyof typeof MaterialIcons.glyphMap | undefined => {
@@ -468,6 +518,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
               onPositionRefresh={loadBlindsPosition}
               onPositionDisplayReady={setHeaderPositionDisplay}
               onDragStateChange={setIsDraggingBlinds}
+              onDragPercentageChange={setCurrentBlindsPercentage}
               loading={blindsLoading}
               disabled={!isConnected}
               currentPosition={blindsPosition}
@@ -588,6 +639,29 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     marginBottom: 8,
+  },
+  headerPositionWrapper: {
+    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerPositionText: {
+    fontSize: 48,
+    fontFamily: typography.fontFamily.bold,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    lineHeight: 56,
+  },
+  headerGateMessageText: {
+    fontSize: 18,
+    fontFamily: typography.fontFamily.semiBold,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    opacity: 0.95,
   },
 });
 

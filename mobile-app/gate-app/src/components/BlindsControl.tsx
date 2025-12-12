@@ -17,6 +17,7 @@ interface BlindsControlProps {
   direction?: number; // -1 = closing, 0 = stopped, 1 = opening
   onPositionDisplayReady?: (element: React.ReactNode) => void; // Callback to pass position display to header
   onDragStateChange?: (isDragging: boolean) => void; // Callback to notify parent about drag state
+  onDragPercentageChange?: (percentage: number) => void; // Callback to notify parent about current percentage during drag
   mockMode?: boolean; // Mock mode for testing design without API calls
 }
 
@@ -32,6 +33,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
   direction = 0,
   onPositionDisplayReady,
   onDragStateChange,
+  onDragPercentageChange,
   mockMode = false,
 }) => {
   const { colors, accentColor } = useTheme();
@@ -41,13 +43,11 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
   const [actionLoading, setActionLoading] = useState<'open' | 'close' | 'stop' | null>(null);
   const positionAnim = React.useRef(new Animated.Value(currentPosition >= 0 ? currentPosition : 50)).current;
   const [isDragging, setIsDragging] = useState(false);
-  const [dragPercentage, setDragPercentage] = useState<number>(0); // Current percentage during drag
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const blindsFrameRef = React.useRef<View>(null);
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const pendingPositionRef = React.useRef<number | null>(null);
-  const dragIndicatorOpacity = React.useRef(new Animated.Value(0)).current;
-  const dragIndicatorScale = React.useRef(new Animated.Value(0.8)).current;
+  const animationFrameRef = React.useRef<number | null>(null);
   
   const BLINDS_HEIGHT = 200;
   const SLAT_COUNT = 12; // Liczba pasków żaluzji
@@ -91,37 +91,15 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
     }
   }, [isDragging, onDragStateChange]);
 
-  // Animate drag indicator when dragging starts/stops
+  // Cleanup animation frame on unmount
   useEffect(() => {
-    if (isDragging) {
-      Animated.parallel([
-        Animated.timing(dragIndicatorOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.spring(dragIndicatorScale, {
-          toValue: 1,
-          friction: 4,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(dragIndicatorOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dragIndicatorScale, {
-          toValue: 0.8,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [isDragging, dragIndicatorOpacity, dragIndicatorScale]);
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, []);
 
   // Create position display for header (empty now - moved to main content)
   useEffect(() => {
@@ -322,9 +300,18 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
       onMoveShouldSetPanResponder: () => !disabled && !loading && !actionLoading,
       onMoveShouldSetPanResponderCapture: () => !disabled && !loading && !actionLoading,
       onPanResponderGrant: (evt) => {
+        // Store values before async operations to avoid null reference
+        // Use optional chaining for iOS compatibility
+        if (!evt?.nativeEvent?.pageY || evt.nativeEvent.pageY === undefined) {
+          return;
+        }
+        
+        const grantPageY = evt.nativeEvent.pageY;
+        const grantPageX = evt.nativeEvent.pageX || 0;
+        
         // Store start time and position for tap detection
         gestureStartTime.current = Date.now();
-        gestureStartPosition.current = { x: evt.nativeEvent.pageX, y: evt.nativeEvent.pageY };
+        gestureStartPosition.current = { x: grantPageX, y: grantPageY };
         
         isDraggingRef.current = true;
         setIsDragging(true);
@@ -339,17 +326,18 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
           blindsFrameLayout.current.pageY = y;
           blindsFrameLayout.current.height = height || BLINDS_HEIGHT;
           
-          // Now calculate position with accurate measurements
-          const { pageY } = evt.nativeEvent;
+          // Now calculate position with accurate measurements (use stored pageY)
           const framePageY = y;
           const frameHeight = height || BLINDS_HEIGHT;
-          const relativeY = pageY - framePageY;
+          const relativeY = grantPageY - framePageY;
           const clampedY = Math.max(0, Math.min(frameHeight, relativeY));
           // Top (0) = 0% closed (open), bottom (frameHeight) = 100% closed
           const percentage = Math.round((clampedY / frameHeight) * 100);
           
-          // Update drag percentage for indicator
-          setDragPercentage(percentage);
+          // Notify parent about current percentage during drag
+          if (onDragPercentageChange) {
+            onDragPercentageChange(percentage);
+          }
           
           if (mockMode) {
             setMockPosition(percentage);
@@ -370,7 +358,17 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
           }
         }
         
-        const { pageY } = evt.nativeEvent;
+        // Store values before requestAnimationFrame to avoid null reference
+        // Use optional chaining and check multiple times for iOS compatibility
+        if (!evt?.nativeEvent?.pageY) {
+          return;
+        }
+        
+        const pageY = evt.nativeEvent.pageY;
+        if (!pageY && pageY !== 0) {
+          return;
+        }
+        
         const framePageY = blindsFrameLayout.current.pageY;
         const frameHeight = blindsFrameLayout.current.height || BLINDS_HEIGHT;
         const relativeY = pageY - framePageY;
@@ -378,28 +376,51 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
         // Top (0) = 0% closed (open), bottom (frameHeight) = 100% closed
         const percentage = Math.round((clampedY / frameHeight) * 100);
         
-        // Update drag percentage for indicator
-        setDragPercentage(percentage);
-        
-        console.log('[BlindsControl] onPanResponderMove:', {
-          pageY,
-          framePageY,
-          frameHeight,
-          relativeY,
-          clampedY,
-          percentage,
-        });
-        
-        // Update position immediately during drag (no animation - instant feedback)
-        if (mockMode) {
-          setMockPosition(percentage);
-        } else {
-          setSliderValue(percentage);
+        // Cancel any pending animation frame
+        if (animationFrameRef.current !== null) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
         }
-        // Set value directly without animation for smooth drag
-        positionAnim.setValue(percentage);
+        
+        // Use requestAnimationFrame for smooth updates on Android
+        animationFrameRef.current = requestAnimationFrame(() => {
+          // Notify parent about current percentage during drag
+          if (onDragPercentageChange) {
+            onDragPercentageChange(percentage);
+          }
+          
+          console.log('[BlindsControl] onPanResponderMove:', {
+            pageY,
+            framePageY,
+            frameHeight,
+            relativeY,
+            clampedY,
+            percentage,
+          });
+          
+          // Update position immediately during drag (no animation - instant feedback)
+          if (mockMode) {
+            setMockPosition(percentage);
+          } else {
+            setSliderValue(percentage);
+          }
+          // Set value directly without animation for smooth drag
+          positionAnim.setValue(percentage);
+        });
       },
       onPanResponderRelease: async (evt, gestureState) => {
+        // Store values before async operations to avoid null reference
+        // Use optional chaining for iOS compatibility
+        if (!evt?.nativeEvent?.pageY || evt.nativeEvent.pageY === undefined) {
+          // Reset dragging state even if evt is null
+          isDraggingRef.current = false;
+          setIsDragging(false);
+          if (onDragStateChange) {
+            onDragStateChange(false);
+          }
+          return;
+        }
+        
         const gestureDuration = Date.now() - gestureStartTime.current;
         const totalMovement = Math.sqrt(gestureState.dx ** 2 + gestureState.dy ** 2);
         
@@ -409,7 +430,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
         // Check if there was actual dragging movement (more than 5px)
         const wasDragging = isDraggingRef.current || totalMovement > 5;
         
-        const { pageY } = evt.nativeEvent;
+        const pageY = evt.nativeEvent.pageY;
         const framePageY = blindsFrameLayout.current.pageY;
         const frameHeight = blindsFrameLayout.current.height || BLINDS_HEIGHT;
         const relativeY = pageY - framePageY;
@@ -434,7 +455,12 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
         // Reset dragging state
         isDraggingRef.current = false;
         setIsDragging(false);
-        setDragPercentage(0); // Reset drag percentage
+        
+        // Cancel any pending animation frame
+        if (animationFrameRef.current !== null) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
         
         // Re-enable parent ScrollView scrolling
         if (onDragStateChange) {
@@ -464,7 +490,13 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
       onPanResponderTerminate: () => {
         isDraggingRef.current = false;
         setIsDragging(false);
-        setDragPercentage(0); // Reset drag percentage
+        
+        // Cancel any pending animation frame
+        if (animationFrameRef.current !== null) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        
         // Re-enable parent ScrollView scrolling
         if (onDragStateChange) {
           onDragStateChange(false);
@@ -531,21 +563,11 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Current Status Card */}
+      {/* Current Status Card - Simplified */}
       <View style={[styles.statusCard, { backgroundColor: colors.card, borderColor: colors.border + '30' }]}>
         <View style={styles.statusCardContent}>
-          <View style={styles.statusCardLeft}>
-            <MaterialIcons name="blinds" size={24} color={colors.accent} style={{ opacity: 0.9 }} />
-            <View style={styles.statusCardText}>
-              <Text style={[styles.statusCardLabel, { color: colors.textSecondary }]}>Obecny stan</Text>
-              <Text style={[styles.statusCardStatus, { color: colors.textPrimary }]}>{getStatusText()}</Text>
-            </View>
-          </View>
-          <View style={styles.statusCardRight}>
-            <Text style={[styles.statusCardValue, { color: colors.accent }]}>
-              {effectivePosition >= 0 ? `${Math.round(effectivePosition)}%` : '—'}
-            </Text>
-          </View>
+          <MaterialIcons name="blinds" size={20} color={colors.accent} style={{ opacity: 0.9 }} />
+          <Text style={[styles.statusCardStatus, { color: colors.textPrimary }]}>{getStatusText()}</Text>
         </View>
       </View>
 
@@ -628,22 +650,6 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
             ]}
           />
 
-          {/* Drag percentage indicator - shown during dragging */}
-          <Animated.View
-            style={[
-              styles.dragPercentageIndicator,
-              {
-                opacity: dragIndicatorOpacity,
-                transform: [{ scale: dragIndicatorScale }],
-                backgroundColor: colors.accent + 'E6',
-              },
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={[styles.dragPercentageText, { color: '#FFFFFF' }]}>
-              {dragPercentage}%
-            </Text>
-          </Animated.View>
         </View>
 
         {/* Position labels on the right - reversed (0% top, 100% bottom) */}
@@ -739,52 +745,27 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 0,
   },
   statusCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1,
-    elevation: 2,
+    elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   statusCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statusCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  statusCardText: {
-    flex: 1,
-  },
-  statusCardLabel: {
-    fontSize: 11,
-    fontFamily: typography.fontFamily.medium,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-    opacity: 0.7,
+    gap: 10,
   },
   statusCardStatus: {
-    fontSize: 15,
-    fontFamily: typography.fontFamily.semiBold,
-  },
-  statusCardRight: {
-    alignItems: 'flex-end',
-  },
-  statusCardValue: {
-    fontSize: 32,
-    fontFamily: typography.fontFamily.bold,
-    lineHeight: 38,
+    fontSize: 14,
+    fontFamily: typography.fontFamily.medium,
   },
   mainControlArea: {
     flexDirection: 'row',
@@ -863,31 +844,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderTopColor: 'rgba(255, 255, 255, 0.3)',
     borderBottomColor: 'rgba(0, 0, 0, 0.2)',
-  },
-  dragPercentageIndicator: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginTop: -25,
-    marginLeft: -40,
-    width: 80,
-    height: 50,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  dragPercentageText: {
-    fontSize: 24,
-    fontFamily: typography.fontFamily.bold,
-    fontWeight: 'bold',
   },
   positionLabels: {
     width: 55,
