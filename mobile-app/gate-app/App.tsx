@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus, Platform, Text, Animated } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus, Platform, Text, Animated, BackHandler } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 // import { useFonts } from 'expo-font'; // Not used - removed to prevent potential issues
 import LoginScreen from './src/screens/LoginScreen';
@@ -12,11 +12,12 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import BiometricLockScreen from './src/screens/BiometricLockScreen';
 import BottomTabBar, { TabRoute } from './src/components/Navigation/BottomTabBar';
+import SwipeBackGesture from './src/components/Navigation/SwipeBackGesture';
 import VpnStatusBanner from './src/components/VpnStatusBanner';
 import { StorageService } from './src/services/StorageService';
 import NotificationService from './src/services/NotificationService';
 import ActivityService from './src/services/ActivityService';
-import { SmartDevice, GateType, DeviceCategory, CategoryType } from './src/types';
+import { SmartDevice, GateType, DeviceCategory, DeviceType } from './src/types';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { useGatewayReachability } from './src/hooks/useGatewayReachability';
 
@@ -25,13 +26,16 @@ type Screen = 'home' | 'gates' | 'gate-detail' | 'settings' | 'category-devices'
 function AppContent() {
   const { colors } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLocked, setIsLocked] = useState(true);
+  const [isLocked, setIsLocked] = useState(false); // Start unlocked - no login required
   const [isLoading, setIsLoading] = useState(true);
+  const [showLoginForAction, setShowLoginForAction] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [currentTab, setCurrentTab] = useState<TabRoute>('home');
   const [selectedGateType, setSelectedGateType] = useState<GateType | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<DeviceCategory | null>(null);
-  const [selectedRoom, setSelectedRoom] = useState<CategoryType>('all');
+  const [selectedCategory, setSelectedCategory] = useState<DeviceCategory | 'all' | null>(null);
+  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
+  const [previousCategory, setPreviousCategory] = useState<DeviceCategory | 'all' | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const [showAnimatedContent, setShowAnimatedContent] = useState(false);
@@ -209,56 +213,13 @@ function AppContent() {
   // Removed - moved to useEffect to prevent stale closure issues
 
   const checkAuthentication = async () => {
-    // Prevent concurrent authentication checks
-    if (authCheckInProgressRef.current) {
-      return;
-    }
-
-    authCheckInProgressRef.current = true;
-
-    // Add timeout to prevent infinite loading
-    const timeoutPromise = new Promise<void>((resolve) => {
-      setTimeout(() => {
-        resolve();
-      }, 5000); // Increased to 5 second timeout for slower devices
-    });
-
-    try {
-      const authPromise = (async () => {
-        const token = await StorageService.getToken();
-        
-        if (!isMountedRef.current) return;
-        
-        if (token) {
-          // Verify token is still valid
-          if (StorageService.isTokenValid(token)) {
-            setIsAuthenticated(true);
-          } else {
-            // Token expired, logout
-            await handleLogout();
-          }
-        } else {
-          setIsAuthenticated(false);
-        }
-      })();
-
-      // Race between auth check and timeout
-      await Promise.race([authPromise, timeoutPromise]);
-    } catch (error) {
-      console.error('[App] Error checking authentication:', error);
-      // Don't force logout on error - keep previous state or let user try again
-      if (isMountedRef.current && !isAuthenticated) {
-        // Only set to false if we weren't already authenticated
-        // This prevents random logouts on transient errors
-        setIsAuthenticated(false);
-      }
-    } finally {
-      authCheckInProgressRef.current = false;
-      // Only set loading to false if this is the initial mount
-      if (isMountedRef.current && isInitialMountRef.current) {
-        setIsLoading(false);
-        isInitialMountRef.current = false;
-      }
+    // No forced authentication check - app starts without login
+    // Authentication will be checked only when ESP32 functions are used
+    if (isMountedRef.current && isInitialMountRef.current) {
+      setIsLoading(false);
+      setIsAuthenticated(false);
+      setIsLocked(false);
+      isInitialMountRef.current = false;
     }
   };
   
@@ -269,9 +230,21 @@ function AppContent() {
     };
   }
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = async () => {
     setIsAuthenticated(true);
     setIsLocked(false);
+    setShowLoginForAction(false);
+    
+    // Execute pending action if exists (lazy auth)
+    if (pendingAction) {
+      try {
+        await pendingAction();
+      } catch (error) {
+        console.error('[App] Failed to execute pending action:', error);
+      }
+      setPendingAction(null);
+    }
+    
     // Trigger animation
     setShowAnimatedContent(true);
     Animated.parallel([
@@ -286,6 +259,13 @@ function AppContent() {
         useNativeDriver: true,
       }),
     ]).start();
+  };
+
+  // Handler for lazy authentication - when ESP32 function requires auth
+  const handleAuthRequired = (action: () => Promise<void>) => {
+    setPendingAction(() => action);
+    setShowLoginForAction(true);
+    setIsAuthenticated(false);
   };
 
   const handleLogout = async () => {
@@ -307,40 +287,122 @@ function AppContent() {
   };
 
   const handleDevicePress = (device: SmartDevice) => {
-    if (device.type === 'gate') {
-      setCurrentScreen('gates');
+    // Don't handle disabled devices
+    if (!device.enabled) {
+      return;
+    }
+    
+    // Save current screen and category before navigating
+    setPreviousScreen(currentScreen);
+    // If we're on 'gates' screen, save 'gates' as previous category
+    // If we're on 'category-devices' screen, save the current selectedCategory
+    if (currentScreen === 'gates') {
+      setPreviousCategory('gates');
+    } else {
+      setPreviousCategory(selectedCategory);
+    }
+    
+    // Handle gates and blinds - navigate to appropriate gate detail screen
+    if (device.type === DeviceType.GATE || device.type === DeviceType.BLINDS) {
+      // Device ID is now GateType enum value
+      setSelectedGateType(device.id as GateType);
+      setCurrentScreen('gate-detail');
     }
     // For other device types, could navigate to detail screens
   };
 
-  const handleCategoryPress = (category: DeviceCategory, room: CategoryType) => {
+  const handleCategoryPress = (category: DeviceCategory | 'all') => {
+    // For 'all', show all devices in CategoryDevicesScreen
+    if (category === 'all') {
+      setSelectedCategory('all');
+      setCurrentScreen('category-devices');
+      return;
+    }
+    
     // For gates, go directly to GatesScreen instead of CategoryDevicesScreen
     if (category === 'gates') {
       setCurrentScreen('gates');
     } else {
       setSelectedCategory(category);
-      setSelectedRoom(room);
       setCurrentScreen('category-devices');
     }
   };
 
   const handleGatePress = (gateType: GateType) => {
+    // Save current screen and category before navigating
+    setPreviousScreen(currentScreen);
+    // We're on 'gates' screen, so save 'gates' as previous category
+    setPreviousCategory('gates');
+    
     setSelectedGateType(gateType);
     setCurrentScreen('gate-detail');
   };
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (currentScreen === 'gate-detail') {
-      setCurrentScreen('gates');
+      // Return to previous screen/category if available
+      if (previousScreen && previousScreen !== 'gate-detail') {
+        setCurrentScreen(previousScreen);
+        // Restore the previous category
+        if (previousCategory !== null) {
+          setSelectedCategory(previousCategory);
+        }
+        // Clear previous state
+        setPreviousScreen(null);
+        setPreviousCategory(null);
+      } else {
+        // Fallback to gates screen
+        setCurrentScreen('gates');
+        setSelectedCategory('gates');
+      }
       setSelectedGateType(null);
     } else if (currentScreen === 'gates') {
       setCurrentScreen('home');
+      setSelectedCategory(null);
     } else if (currentScreen === 'category-devices') {
       setCurrentScreen('home');
       setSelectedCategory(null);
-      setSelectedRoom('all');
+    } else if (currentTab === 'settings') {
+      setCurrentTab('home');
+      setCurrentScreen('home');
+    } else if (currentTab === 'stats') {
+      setCurrentTab('home');
+      setCurrentScreen('home');
+    } else {
+      return false; // Allow default back action (exit app)
     }
-  };
+    return true; // Prevent default back action
+  }, [currentScreen, currentTab, previousScreen, previousCategory]);
+
+  // Handle Android back button
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      // If login screen is shown, don't handle back button
+      if (showLoginForAction) {
+        return false; // Allow default behavior (close login)
+      }
+
+      // If locked (biometric screen), don't handle back button
+      if (isAuthenticated && isLocked) {
+        return false; // Allow default behavior
+      }
+
+      // If we're not on home screen, go back
+      if (currentScreen !== 'home' || currentTab !== 'home') {
+        handleBack();
+        return true; // Prevent default behavior (closing app)
+      }
+
+      // If we're on home screen, allow default behavior (close app)
+      return false;
+    });
+
+    return () => backHandler.remove();
+  }, [currentScreen, currentTab, showLoginForAction, isAuthenticated, isLocked, handleBack]);
 
   const handleLogoutFromScreen = async () => {
     await handleLogout();
@@ -348,7 +410,6 @@ function AppContent() {
     setCurrentTab('home');
     setSelectedGateType(null);
     setSelectedCategory(null);
-    setSelectedRoom('all');
   };
 
   const handleTabNavigate = (route: TabRoute) => {
@@ -362,6 +423,8 @@ function AppContent() {
     }
   };
 
+  // Only show lock screen if user is authenticated (has token) and app is locked
+  // If not authenticated, app works without lock
   if (isAuthenticated && isLocked) {
     return (
       <View style={styles.container}>
@@ -405,39 +468,60 @@ function AppContent() {
             }}
           >
             <HomeScreen
-              onDevicePress={handleDevicePress}
               onCategoryPress={handleCategoryPress}
               onLogout={handleLogoutFromScreen}
             />
           </Animated.View>
         );
       case 'category-devices':
-        return selectedCategory ? (
-          <CategoryDevicesScreen
-            category={selectedCategory}
-            room={selectedRoom}
-            onDevicePress={handleDevicePress}
-            onBack={handleBack}
-          />
-        ) : null;
+        return (
+          <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
+            <CategoryDevicesScreen
+              category={selectedCategory || 'all'}
+              onDevicePress={handleDevicePress}
+              onCategorySelect={(category) => {
+                if (category === 'all') {
+                  setSelectedCategory(null);
+                  // Stay on category-devices to show all devices
+                } else if (category === 'gates') {
+                  setCurrentScreen('gates');
+                } else {
+                  setSelectedCategory(category as DeviceCategory);
+                }
+              }}
+            />
+          </SwipeBackGesture>
+        );
       case 'gates':
         return (
-          <GatesScreen
-            onGatePress={handleGatePress}
-            onBack={handleBack}
-          />
+          <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
+            <GatesScreen
+              onGatePress={handleGatePress}
+              onCategorySelect={(category) => {
+                if (category === 'all') {
+                  setCurrentScreen('home');
+                } else if (category !== 'gates') {
+                  // Navigate to other category
+                  setSelectedCategory(category as DeviceCategory);
+                  setCurrentScreen('category-devices');
+                }
+              }}
+            />
+          </SwipeBackGesture>
         );
       case 'gate-detail':
         return selectedGateType ? (
-          <GateDetailScreen
-            gateType={selectedGateType}
-            onBack={handleBack}
-          />
+          <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
+            <GateDetailScreen
+              gateType={selectedGateType}
+              onBack={handleBack}
+              onAuthRequired={handleAuthRequired}
+            />
+          </SwipeBackGesture>
         ) : null;
       default:
         return (
           <HomeScreen
-            onDevicePress={handleDevicePress}
             onCategoryPress={handleCategoryPress}
             onLogout={handleLogoutFromScreen}
           />
@@ -462,15 +546,15 @@ function AppContent() {
         message={gatewayMessage}
         onRetry={refreshGatewayStatus}
       />
-      {isAuthenticated ? (
+      {showLoginForAction ? (
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      ) : (
         <>
           <View style={styles.screenContainer}>
             {renderScreen()}
           </View>
           <BottomTabBar currentRoute={currentTab} onNavigate={handleTabNavigate} />
         </>
-      ) : (
-        <LoginScreen onLoginSuccess={handleLoginSuccess} />
       )}
     </View>
   );

@@ -1,26 +1,34 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { DeviceType } from '../types';
+import { DeviceType, GateType } from '../types';
 import { useTheme } from '../theme/useTheme';
 
 interface IconProps {
   type: DeviceType;
   size?: number;
   color?: string;
+  gateType?: GateType; // Optional gate type for icon differentiation
+  deviceId?: string; // Optional device ID for icon differentiation
 }
 
-const Icon: React.FC<IconProps> = ({ type, size = 48, color }) => {
+const Icon: React.FC<IconProps> = ({ type, size = 48, color, gateType, deviceId }) => {
   const { colors } = useTheme();
   const iconColor = color || colors.textPrimary;
 
-  const getIconName = (deviceType: DeviceType): keyof typeof MaterialIcons.glyphMap => {
+  const getIconName = (deviceType: DeviceType, gateType?: GateType, deviceId?: string): keyof typeof MaterialIcons.glyphMap => {
     switch (deviceType) {
       case DeviceType.GATE:
-        return 'power-settings-new';
+        // Different icons for different gate types
+        if (gateType === GateType.ENTRANCE || deviceId === GateType.ENTRANCE) {
+          return 'directions-car'; // Entrance gate = car icon
+        } else if (gateType === GateType.GARAGE || deviceId === GateType.GARAGE) {
+          return 'home'; // Garage gate = home icon
+        }
+        return 'home'; // Default for gates
       case DeviceType.LIGHT:
         return 'lightbulb';
       case DeviceType.HEATING:
-        return 'thermostat'; // Changed from 'ac-unit' to 'thermostat'
+        return 'thermostat';
       case DeviceType.SENSOR:
         return 'sensors';
       case DeviceType.CAMERA:
@@ -39,7 +47,7 @@ const Icon: React.FC<IconProps> = ({ type, size = 48, color }) => {
 
   return (
     <MaterialIcons
-      name={getIconName(type)}
+      name={getIconName(type, gateType, deviceId)}
       size={size}
       color={iconColor}
     />

@@ -8,23 +8,50 @@ import {
   RefreshControl,
   Animated,
 } from 'react-native';
-import { GateType, GateState } from '../types';
+import { GateType, GateState, DeviceCategory, DeviceType } from '../types';
 import NetInfo from '@react-native-community/netinfo';
 import SplitScreen from '../components/Layout/SplitScreen';
+import CategoryHeader from '../components/CategoryHeader';
+import Icon from '../components/Icon';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { MaterialIcons } from '@expo/vector-icons';
+import { StorageService } from '../services/StorageService';
+import { DeviceService } from '../services/DeviceService';
 
 interface GatesScreenProps {
   onGatePress: (gateType: GateType) => void;
-  onBack: () => void;
+  onCategorySelect: (category: DeviceCategory | 'all') => void;
 }
 
-const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
+const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onCategorySelect }) => {
   const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
+  const [username, setUsername] = useState('');
+  const [devices, setDevices] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadUsername();
+    loadDevices();
+  }, []);
+
+  const loadDevices = async () => {
+    try {
+      // Get only gates and blinds from DeviceService
+      const allDevices = await DeviceService.getDevicesByCategoryType('gates');
+      setDevices(allDevices);
+    } catch (error) {
+      console.error('Error loading devices:', error);
+      setDevices([]);
+    }
+  };
+
+  const loadUsername = async () => {
+    const name = await StorageService.getUsername();
+    setUsername(name || 'Użytkownik');
+  };
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -61,28 +88,11 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
   };
 
   const GateListItem: React.FC<{
-    title: string;
-    gateType: GateType;
-    state: GateState;
+    device: any;
     onPress: () => void;
-    disabled?: boolean;
     index?: number;
-  }> = ({ title, gateType, state, onPress, disabled = false, index = 0 }) => {
-    // Different icons for different gates/rolets
-    const getGateIcon = () => {
-      switch (gateType) {
-        case GateType.GARAGE:
-          return 'home'; // Garage gate icon
-        case GateType.ENTRANCE:
-          return 'directions-car'; // Entrance gate icon
-        case GateType.TERRACE_FIX:
-        case GateType.TERRACE_DOOR:
-          return 'blinds'; // Blinds icon for rolets
-        default:
-          return 'home';
-      }
-    };
-
+  }> = ({ device, onPress, index = 0 }) => {
+    const disabled = !device.enabled;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -130,10 +140,12 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
         >
           <View style={styles.gateCardContent}>
             <View style={styles.gateIconContainer}>
-              <MaterialIcons
-                name={getGateIcon()}
+              <Icon
+                type={device.type}
                 size={32}
                 color={disabled ? colors.textSecondary : colors.textPrimary}
+                gateType={device.gateType}
+                deviceId={device.id}
               />
             </View>
             <View style={styles.gateInfo}>
@@ -146,7 +158,7 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
                   },
                 ]}
               >
-                {title}
+                {device.name}
               </Text>
             </View>
             {!disabled && (
@@ -158,8 +170,35 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
     );
   };
 
+  const HeaderContent = (
+    <View>
+      <View style={styles.headerTopRow}>
+        <View>
+          <Text style={[styles.greeting, { color: '#FFFFFF', fontFamily: typography.fontFamily.bold }]}>
+            Cześć, {username}!
+          </Text>
+          <Text style={[styles.subGreeting, { color: 'rgba(255, 255, 255, 0.8)', fontFamily: typography.fontFamily.medium }]}>
+            Witaj w domu
+          </Text>
+        </View>
+      </View>
+      <CategoryHeader 
+        selectedCategory="gates"
+        onSelectCategory={(category) => {
+          if (category === 'all') {
+            onCategorySelect('all');
+          } else if (category !== 'gates') {
+            // Navigate to other category
+            onCategorySelect(category);
+          }
+          // If 'gates' is selected, stay on this screen (do nothing)
+        }}
+      />
+    </View>
+  );
+
   return (
-    <SplitScreen title="Bramy" titleIcon="blinds" onBack={onBack}>
+    <SplitScreen headerContent={HeaderContent}>
       {!isConnected && (
         <View style={[styles.offlineBanner, { backgroundColor: colors.warning }]}>
           <Text style={styles.offlineText}>⚠️ Brak połączenia z siecią</Text>
@@ -172,56 +211,35 @@ const GatesScreen: React.FC<GatesScreenProps> = ({ onGatePress, onBack }) => {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />
         }
       >
-        <>
-            <GateListItem
-              title="Brama Garażowa"
-              gateType={GateType.GARAGE}
-              state={GateState.UNKNOWN}
-              onPress={() => onGatePress(GateType.GARAGE)}
-              index={0}
-            />
-
-            <GateListItem
-              title="Brama Wjazdowa"
-              gateType={GateType.ENTRANCE}
-              state={GateState.UNKNOWN}
-              onPress={() => onGatePress(GateType.ENTRANCE)}
-              disabled={true}
-              index={1}
-            />
-
-            <GateListItem
-              title="Roleta taras (fix)"
-              gateType={GateType.TERRACE_FIX}
-              state={GateState.UNKNOWN}
-              onPress={() => onGatePress(GateType.TERRACE_FIX)}
-              disabled={true}
-              index={2}
-            />
-
-            <GateListItem
-              title="Roleta taras (drzwi)"
-              gateType={GateType.TERRACE_DOOR}
-              state={GateState.UNKNOWN}
-              onPress={() => onGatePress(GateType.TERRACE_DOOR)}
-              disabled={true}
-              index={3}
-            />
-        </>
+        {devices.map((device, index) => (
+          <GateListItem
+            key={device.id}
+            device={device}
+            onPress={() => onGatePress(device.id as GateType)}
+            index={index}
+          />
+        ))}
       </ScrollView>
     </SplitScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  headerRow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 10,
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    marginTop: 15,
+    marginBottom: 15,
+    paddingLeft: 30,
+    paddingRight: 10,
   },
-  backButton: {
-    padding: 8,
+  greeting: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  subGreeting: {
+    fontSize: 14,
   },
   offlineBanner: {
     padding: 12,

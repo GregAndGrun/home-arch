@@ -11,55 +11,26 @@ import {
 } from 'react-native';
 import Icon from '../components/Icon';
 import SplitScreen from '../components/Layout/SplitScreen';
-import { SmartDevice, DeviceType, DeviceCategory, CategoryType } from '../types';
+import CategoryHeader from '../components/CategoryHeader';
+import { SmartDevice, DeviceType, DeviceCategory } from '../types';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { MaterialIcons } from '@expo/vector-icons';
+import { StorageService } from '../services/StorageService';
+import { DeviceService } from '../services/DeviceService';
 
 interface CategoryDevicesScreenProps {
-  category: DeviceCategory;
-  room: CategoryType;
+  category: DeviceCategory | 'all';
   onDevicePress: (device: SmartDevice) => void;
-  onBack: () => void;
+  onCategorySelect: (category: DeviceCategory | 'all') => void;
 }
 
-// Map category to DeviceType
-const categoryToDeviceType: Record<DeviceCategory, DeviceType> = {
-  'gates': DeviceType.GATE,
-  'lights': DeviceType.LIGHT,
-  'temperature': DeviceType.HEATING,
-  'devices': DeviceType.DEVICES,
-};
-
-// Mock data - in real app this would come from API or storage
-const getAllDevices = async (): Promise<SmartDevice[]> => {
-  // Always include gates, even if API fails
-  const gates: SmartDevice[] = [
-    {
-      id: 'gate_garage',
-      name: 'Brama Garażowa',
-      type: DeviceType.GATE,
-      status: { online: false, lastSeen: 0 },
-      enabled: true,
-      category: 'garden',
-      room: 'garden',
-    },
-    {
-      id: 'gate_entrance',
-      name: 'Brama Wjazdowa',
-      type: DeviceType.GATE,
-      status: { online: false, lastSeen: 0 },
-      enabled: true,
-      category: 'garden',
-      room: 'garden',
-    },
-  ];
-
-  return [
-    // GATES (always included)
-    ...gates,
-    // Other device types are not available yet
-  ];
+// Map category to DeviceType (kept for reference, but now using DeviceService)
+const categoryToDeviceType: Record<DeviceCategory, DeviceType[]> = {
+  'gates': [DeviceType.GATE, DeviceType.BLINDS], // Gates category includes both gates and blinds
+  'lights': [DeviceType.LIGHT],
+  'temperature': [DeviceType.HEATING],
+  'devices': [DeviceType.DEVICES],
 };
 
 // Animated device card component
@@ -68,7 +39,8 @@ const AnimatedDeviceCard: React.FC<{
   index: number;
   onPress: () => void;
   colors: any;
-}> = ({ device, index, onPress, colors }) => {
+  disabled?: boolean;
+}> = ({ device, index, onPress, colors, disabled = false }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -97,20 +69,39 @@ const AnimatedDeviceCard: React.FC<{
       }}
     >
       <TouchableOpacity
-        style={[styles.deviceListItem, { backgroundColor: colors.card }]}
-        onPress={onPress}
-        activeOpacity={0.7}
+        style={[
+          styles.deviceListItem, 
+          { backgroundColor: colors.card },
+          disabled && styles.deviceListItemDisabled
+        ]}
+        onPress={disabled ? undefined : onPress}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled}
       >
         <View style={styles.deviceListItemContent}>
           <View style={styles.deviceIconContainer}>
-            <Icon type={device.type} size={32} color={colors.textPrimary} />
+            <Icon 
+              type={device.type} 
+              size={32} 
+              color={disabled ? colors.textSecondary : colors.textPrimary}
+              gateType={device.gateType}
+              deviceId={device.id}
+            />
           </View>
           <View style={styles.deviceInfo}>
-            <Text style={[styles.deviceName, { color: colors.textPrimary, fontFamily: typography.fontFamily.semiBold }]}>
+            <Text style={[
+              styles.deviceName, 
+              { 
+                color: disabled ? colors.textSecondary : colors.textPrimary, 
+                fontFamily: typography.fontFamily.semiBold 
+              }
+            ]}>
               {device.name}
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+          {!disabled && (
+            <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
+          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -119,46 +110,53 @@ const AnimatedDeviceCard: React.FC<{
 
 const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
   category,
-  room,
   onDevicePress,
-  onBack,
+  onCategorySelect,
 }) => {
   const { colors } = useTheme();
   const [devices, setDevices] = useState<SmartDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [username, setUsername] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<DeviceCategory | 'all'>(category || 'all');
+
+  useEffect(() => {
+    loadUsername();
+  }, []);
+
+  useEffect(() => {
+    setSelectedCategory(category || 'all');
+  }, [category]);
+
+  useEffect(() => {
+    onCategorySelect(selectedCategory);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory]);
+
+  const loadUsername = async () => {
+    const name = await StorageService.getUsername();
+    setUsername(name || 'Użytkownik');
+  };
 
   useEffect(() => {
     loadDevices();
-  }, [category, room]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory]);
 
-  const loadDevices = async () => {
-    setLoading(true);
-    try {
-      const allDevices = await getAllDevices();
-      const deviceType = categoryToDeviceType[category];
-      
-      // Filter by category type first
-      let filtered = allDevices.filter(d => d.type === deviceType);
-      
-      // Then filter by room if not 'all'
-      // For 'all', show all devices of this type regardless of room
-      if (room !== 'all') {
-        filtered = filtered.filter(d => {
-          // Match by room or category field
-          return d.room === room || d.category === room;
-        });
-      }
-      
-      setDevices(filtered);
-    } catch (error) {
-      console.error('Error loading devices:', error);
-      setDevices([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+      const loadDevices = async () => {
+        setLoading(true);
+        try {
+          // Use DeviceService - single source of truth
+          const allDevices = await DeviceService.getDevicesByCategoryType(selectedCategory);
+          setDevices(allDevices);
+        } catch (error) {
+          console.error('Error loading devices:', error);
+          setDevices([]);
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      };
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -166,43 +164,51 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
   };
 
   const getCategoryName = (): string => {
+    if (selectedCategory === 'all') {
+      return 'Wszystkie';
+    }
     const names: Record<DeviceCategory, string> = {
-      'gates': 'Bramy/Rolety',
+      'gates': 'Rolety',
       'lights': 'Oświetlenie',
       'temperature': 'Temperatura',
       'devices': 'Urządzenia',
     };
-    return names[category];
+    return names[selectedCategory as DeviceCategory];
   };
 
   const getCategoryIcon = (): keyof typeof MaterialIcons.glyphMap => {
-    const icons: Record<DeviceCategory, keyof typeof MaterialIcons.glyphMap> = {
+    const icons: Record<DeviceCategory | 'all', keyof typeof MaterialIcons.glyphMap> = {
+      'all': 'dashboard',
       'gates': 'blinds',
       'lights': 'lightbulb',
       'temperature': 'thermostat',
       'devices': 'devices',
     };
-    return icons[category];
+    return icons[selectedCategory];
   };
 
-  const getRoomName = (): string => {
-    const names: Record<CategoryType, string> = {
-      'all': 'Wszystkie',
-      'kitchen': 'Kuchnia',
-      'garden': 'Ogród',
-      'living-room': 'Salon',
-      'bedroom': 'Sypialnia',
-      'bathroom': 'Łazienka',
-    };
-    return names[room];
-  };
+
+  const HeaderContent = (
+    <View>
+      <View style={styles.headerTopRow}>
+        <View>
+          <Text style={[styles.greeting, { color: '#FFFFFF', fontFamily: typography.fontFamily.bold }]}>
+            Cześć, {username}!
+          </Text>
+          <Text style={[styles.subGreeting, { color: 'rgba(255, 255, 255, 0.8)', fontFamily: typography.fontFamily.medium }]}>
+            Witaj w domu
+          </Text>
+        </View>
+      </View>
+      <CategoryHeader 
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+      />
+    </View>
+  );
 
   return (
-    <SplitScreen 
-      title={getCategoryName()} 
-      titleIcon={getCategoryIcon()}
-      onBack={onBack}
-    >
+    <SplitScreen headerContent={HeaderContent}>
       <ScrollView
         contentContainerStyle={styles.contentContainer}
         refreshControl={
@@ -232,6 +238,7 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
                   index={index}
                   onPress={() => onDevicePress(device)}
                   colors={colors}
+                  disabled={!device.enabled}
                 />
               ))
             )}
@@ -243,14 +250,21 @@ const CategoryDevicesScreen: React.FC<CategoryDevicesScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  headerRow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 10,
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    marginTop: 15,
+    marginBottom: 15,
+    paddingLeft: 30,
+    paddingRight: 10,
   },
-  backButton: {
-    padding: 8,
+  greeting: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  subGreeting: {
+    fontSize: 14,
   },
   contentContainer: {
     padding: 16,
@@ -264,6 +278,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  deviceListItemDisabled: {
+    opacity: 0.5,
   },
   deviceListItemContent: {
     flexDirection: 'row',

@@ -3,26 +3,24 @@ import { ScrollView, TouchableOpacity, Text, StyleSheet, View, Animated } from '
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
-
-export type CategoryType = 'all' | 'kitchen' | 'garden' | 'living-room' | 'bedroom' | 'bathroom';
+import { DeviceCategory } from '../types';
 
 interface CategoryHeaderProps {
-  selectedCategory: CategoryType;
-  onSelectCategory: (category: CategoryType) => void;
+  selectedCategory: DeviceCategory | 'all';
+  onSelectCategory: (category: DeviceCategory | 'all') => void;
 }
 
-const categories: { id: CategoryType; label: string; icon: keyof typeof MaterialIcons.glyphMap }[] = [
+const categories: { id: DeviceCategory | 'all'; label: string; icon: keyof typeof MaterialIcons.glyphMap }[] = [
   { id: 'all', label: 'Wszystkie', icon: 'dashboard' },
-  { id: 'kitchen', label: 'Kuchnia', icon: 'restaurant' },
-  { id: 'garden', label: 'Ogród', icon: 'yard' },
-  { id: 'living-room', label: 'Salon', icon: 'weekend' },
-  { id: 'bedroom', label: 'Sypialnia', icon: 'bed' },
-  { id: 'bathroom', label: 'Łazienka', icon: 'bathtub' },
+  { id: 'gates', label: 'Rolety', icon: 'blinds' },
+  { id: 'lights', label: 'Oświetlenie', icon: 'lightbulb' },
+  { id: 'temperature', label: 'Temperatura', icon: 'thermostat' },
+  { id: 'devices', label: 'Urządzenia', icon: 'devices' },
 ];
 
 // Animated category item component
 const AnimatedCategoryItem: React.FC<{
-  cat: { id: CategoryType; label: string; icon: keyof typeof MaterialIcons.glyphMap };
+  cat: { id: DeviceCategory | 'all'; label: string; icon: keyof typeof MaterialIcons.glyphMap };
   index: number;
   isSelected: boolean;
   onPress: () => void;
@@ -120,22 +118,24 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingLeft: 30,
     paddingRight: 10,
-    gap: 12,
+    gap: 8,
   },
   item: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 16,
     flexDirection: 'column',
     gap: 4,
-    minWidth: 75,
-    maxWidth: 85,
+    minWidth: 80,
+    maxWidth: 100,
   },
   label: {
     color: '#FFFFFF',
     fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 14,
   },
 });
 

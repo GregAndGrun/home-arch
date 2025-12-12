@@ -80,6 +80,8 @@ Thumbs.db
 build/
 dist/
 out/
+*.apk
+mobile-app/**/*.apk
 
 # Temporary files
 tmp/

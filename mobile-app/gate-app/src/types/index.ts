@@ -17,6 +17,8 @@ export enum GateType {
   GARAGE = 'garage',
   TERRACE_FIX = 'terrace-fix',
   TERRACE_DOOR = 'terrace-door',
+  LIVING_ROOM_FIX = 'living-room-fix',
+  LIVING_ROOM_TERRACE = 'living-room-terrace',
 }
 
 export enum GateState {
@@ -70,6 +72,7 @@ export interface SmartDevice {
   enabled: boolean;
   category?: string; // Room category: 'kitchen', 'garden', 'living-room', 'bedroom', 'bathroom'
   room?: string; // Room name for filtering
+  gateType?: GateType; // Gate type for icon differentiation (only for GATE and BLINDS types)
 }
 
 export interface DeviceStatus {
