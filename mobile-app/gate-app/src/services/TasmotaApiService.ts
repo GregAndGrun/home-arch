@@ -282,6 +282,7 @@ class TasmotaApiService {
       if (shutter?.Position !== undefined && shutter?.Direction !== undefined) {
         // Tasmota position: 0% = closed, 100% = open (inverted from app)
         const tasmotaPosition = Math.max(0, Math.min(100, shutter.Position));
+        const tasmotaTarget = shutter.Target !== undefined ? Math.max(0, Math.min(100, shutter.Target)) : tasmotaPosition;
         
         // Tasmota uses: 0% = closed, 100% = open
         // App uses: 0% = open, 100% = closed
@@ -296,10 +297,38 @@ class TasmotaApiService {
         // Direction: Tasmota 1 = opening (moving towards 100%), -1 = closing (moving towards 0%)
         // App: 1 = opening (moving towards 0%), -1 = closing (moving towards 100%)
         // Since position is inverted, direction should also be inverted
-        const appDirection = shutter.Direction === 1 ? -1 : shutter.Direction === -1 ? 1 : 0;
+        let appDirection = shutter.Direction === 1 ? -1 : shutter.Direction === -1 ? 1 : 0;
+        
+        // Check if blinds have reached target or are at limits
+        // If position is at target (within 1%) or at limits (0% or 100%), force direction to 0
+        const positionDiff = Math.abs(tasmotaPosition - tasmotaTarget);
+        const isAtTarget = positionDiff < 1; // Within 1% of target
+        
+        // Check limits in both Tasmota and App coordinate systems
+        // Tasmota: 0% = closed, 100% = open
+        // App: 0% = open, 100% = closed (inverted)
+        const isAtTasmotaLimit = tasmotaPosition <= 1 || tasmotaPosition >= 99; // At Tasmota 0% or 100%
+        const isAtAppLimit = finalPosition <= 1 || finalPosition >= 99; // At App 0% or 100%
+        const isAtLimit = isAtTasmotaLimit || isAtAppLimit;
+        
+        if (isAtTarget || isAtLimit) {
+          // Blinds have reached target or are at limits, force direction to 0
+          appDirection = 0;
+          console.log('[TasmotaApiService] Forcing direction to 0:', {
+            isAtTarget,
+            isAtTasmotaLimit,
+            isAtAppLimit,
+            tasmotaPosition,
+            finalPosition,
+          });
+        }
         
         console.log('[TasmotaApiService] getBlindsStatus:', {
           tasmotaPosition,
+          tasmotaTarget,
+          positionDiff,
+          isAtTarget,
+          isAtLimit,
           appPosition,
           finalPosition,
           tasmotaDirection: shutter.Direction,

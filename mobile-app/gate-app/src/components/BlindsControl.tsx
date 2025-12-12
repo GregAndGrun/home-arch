@@ -14,6 +14,7 @@ interface BlindsControlProps {
   loading?: boolean;
   disabled?: boolean;
   currentPosition?: number; // 0-100 or -1 if unknown
+  direction?: number; // -1 = closing, 0 = stopped, 1 = opening
   onPositionDisplayReady?: (element: React.ReactNode) => void; // Callback to pass position display to header
   onDragStateChange?: (isDragging: boolean) => void; // Callback to notify parent about drag state
   mockMode?: boolean; // Mock mode for testing design without API calls
@@ -28,6 +29,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
   loading = false,
   disabled = false,
   currentPosition = -1,
+  direction = 0,
   onPositionDisplayReady,
   onDragStateChange,
   mockMode = false,
@@ -35,7 +37,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
   const { colors, accentColor } = useTheme();
   const [sliderValue, setSliderValue] = useState(currentPosition >= 0 ? currentPosition : 50);
   const [mockPosition, setMockPosition] = useState(currentPosition >= 0 ? currentPosition : 50);
-  const [isMoving, setIsMoving] = useState(false);
+  const [isMoving, setIsMoving] = useState(direction !== 0);
   const [actionLoading, setActionLoading] = useState<'open' | 'close' | 'stop' | null>(null);
   const positionAnim = React.useRef(new Animated.Value(currentPosition >= 0 ? currentPosition : 50)).current;
   const [isDragging, setIsDragging] = useState(false);
@@ -61,6 +63,23 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
       }).start();
     }
   }, [effectivePosition, isDragging]);
+
+  // Synchronize isMoving with direction prop from parent
+  useEffect(() => {
+    // If direction is provided (not in mock mode), use it to determine isMoving
+    if (!mockMode) {
+      const shouldBeMoving = direction !== 0;
+      if (isMoving !== shouldBeMoving) {
+        console.log('[BlindsControl] Syncing isMoving with direction:', {
+          direction,
+          isMoving,
+          shouldBeMoving,
+          currentPosition,
+        });
+        setIsMoving(shouldBeMoving);
+      }
+    }
+  }, [direction, mockMode, currentPosition]);
 
   // Notify parent about drag state changes
   useEffect(() => {
@@ -97,7 +116,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
     }
     
     setActionLoading('open');
-    setIsMoving(true);
+    // Note: isMoving is now controlled by direction prop
     try {
       await onOpen();
     } finally {
@@ -135,7 +154,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
     }
     
     setActionLoading('close');
-    setIsMoving(true);
+    // Note: isMoving is now controlled by direction prop
     try {
       await onClose();
     } finally {
@@ -231,7 +250,7 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
     }
     
     try {
-      setIsMoving(true);
+      // Note: isMoving is now controlled by direction prop, not manually set
       console.log('[BlindsControl] sendPositionChange calling onPositionChange:', { value });
       await onPositionChange(value);
       console.log('[BlindsControl] sendPositionChange onPositionChange completed');
@@ -243,17 +262,15 @@ const BlindsControl: React.FC<BlindsControlProps> = ({
           if (pos >= 0) {
             setSliderValue(pos);
           }
-          setIsMoving(false);
+          // isMoving is controlled by direction prop
         }, 2000);
-      } else {
-        setTimeout(() => setIsMoving(false), 2000);
       }
     } catch (error) {
       // Revert slider on error
       if (currentPosition >= 0) {
         setSliderValue(currentPosition);
       }
-      setIsMoving(false);
+      // isMoving is controlled by direction prop
     }
   };
 

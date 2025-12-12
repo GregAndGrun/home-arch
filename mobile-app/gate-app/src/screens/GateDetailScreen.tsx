@@ -42,6 +42,9 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   const [isDraggingBlinds, setIsDraggingBlinds] = useState(false);
   const [blindsDirection, setBlindsDirection] = useState<number>(0); // -1 = closing, 0 = stopped, 1 = opening
   const positionPollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastPositionRef = useRef<number>(-1);
+  const lastPositionChangeTimeRef = useRef<number>(Date.now());
+  const positionStableTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isBlinds = gateType === GateType.LIVING_ROOM_FIX || gateType === GateType.LIVING_ROOM_TERRACE;
 
@@ -84,6 +87,11 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
         clearInterval(positionPollingIntervalRef.current);
         positionPollingIntervalRef.current = null;
       }
+      // Cleanup position stable timeout
+      if (positionStableTimeoutRef.current) {
+        clearTimeout(positionStableTimeoutRef.current);
+        positionStableTimeoutRef.current = null;
+      }
     };
   }, [isBlinds]);
 
@@ -113,6 +121,11 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       if (positionPollingIntervalRef.current) {
         clearInterval(positionPollingIntervalRef.current);
         positionPollingIntervalRef.current = null;
+      }
+      // Cleanup position stable timeout
+      if (positionStableTimeoutRef.current) {
+        clearTimeout(positionStableTimeoutRef.current);
+        positionStableTimeoutRef.current = null;
       }
     };
   }, [blindsDirection, isBlinds]);
@@ -175,13 +188,68 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     if (!isBlinds) return;
     try {
       const status = await ApiService.getBlindsStatus(gateType);
-      setBlindsPosition(status.position);
-      setBlindsDirection(status.direction);
-      return status.direction !== 0; // Return true if moving
+      const currentPosition = status.position;
+      const currentDirection = status.direction;
+      
+      // Check if position is at limits (0% or 100%)
+      const isAtLimit = currentPosition <= 1 || currentPosition >= 99;
+      
+      // If at limits, always force direction to 0
+      if (isAtLimit && currentDirection !== 0) {
+        console.log('[GateDetailScreen] Position at limit, forcing direction to 0:', {
+          currentPosition,
+          currentDirection,
+          isAtLimit,
+        });
+        setBlindsPosition(currentPosition);
+        setBlindsDirection(0);
+        lastPositionRef.current = currentPosition;
+        lastPositionChangeTimeRef.current = Date.now();
+        return false; // Not moving
+      }
+      
+      // Check if position has changed
+      const positionChanged = Math.abs(currentPosition - lastPositionRef.current) > 0.5; // 0.5% threshold
+      
+      if (positionChanged) {
+        // Position changed - update last position and reset timer
+        lastPositionRef.current = currentPosition;
+        lastPositionChangeTimeRef.current = Date.now();
+        
+        // Clear any existing timeout
+        if (positionStableTimeoutRef.current) {
+          clearTimeout(positionStableTimeoutRef.current);
+          positionStableTimeoutRef.current = null;
+        }
+        
+        // If direction says it's moving, set it
+        setBlindsPosition(currentPosition);
+        setBlindsDirection(currentDirection);
+      } else {
+        // Position hasn't changed - check if it's been stable for a while
+        const timeSinceLastChange = Date.now() - lastPositionChangeTimeRef.current;
+        const STABLE_THRESHOLD = 2000; // 2 seconds
+        
+        if (timeSinceLastChange > STABLE_THRESHOLD && currentDirection !== 0) {
+          // Position has been stable for 2+ seconds but direction still says moving
+          // Force direction to 0 (stopped)
+          console.log('[GateDetailScreen] Position stable for 2+ seconds, forcing direction to 0');
+          setBlindsPosition(currentPosition);
+          setBlindsDirection(0);
+        } else {
+          // Position hasn't changed but it's been less than 2 seconds
+          // Keep current direction but update position
+          setBlindsPosition(currentPosition);
+          setBlindsDirection(currentDirection);
+        }
+      }
+      
+      return currentDirection !== 0; // Return true if moving
     } catch (error) {
       console.error('[GateDetailScreen] Failed to load blinds status:', error);
       setBlindsPosition(-1);
       setBlindsDirection(0);
+      lastPositionRef.current = -1;
       return false;
     }
   }, [gateType, isBlinds]);
@@ -389,6 +457,7 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
               loading={blindsLoading}
               disabled={!isConnected}
               currentPosition={blindsPosition}
+              direction={blindsDirection}
               mockMode={false}
             />
           ) : (
