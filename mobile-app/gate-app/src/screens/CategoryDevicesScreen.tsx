@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
     marginTop: 15,
-    marginBottom: 8, // Reduced from 15 to move categories up
+    marginBottom: 12, // Increased to center categories vertically
     paddingLeft: 30,
     paddingRight: 10,
   },

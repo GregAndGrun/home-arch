@@ -122,7 +122,7 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({ selectedCategory, onSel
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 8, // Reduced from 15 to move categories up
+    marginTop: 12, // Increased to center categories vertically between title and bottom edge
   },
   scrollContent: {
     paddingLeft: 30,
