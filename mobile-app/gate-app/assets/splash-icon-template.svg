@@ -1,0 +1,15 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Splash screen icon - większy rozmiar, bez cienia -->
+  <!-- Niebieski kontur domu z literą G -->
+  <g transform="translate(512, 512)">
+    <!-- Dach (trójkąt) - niebieski kontur -->
+    <path d="M 0 -200 L -240 160 L 240 160 Z" fill="none" stroke="#2196F3" stroke-width="45" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Ściany domu -->
+    <rect x="-240" y="160" width="480" height="320" fill="none" stroke="#2196F3" stroke-width="45" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Litera G - duża, niebieska, wyśrodkowana w środku domu -->
+    <text x="0" y="80" font-family="Arial, sans-serif" font-size="320" font-weight="bold" fill="#2196F3" text-anchor="middle" dominant-baseline="central">G</text>
+  </g>
+</svg>
+

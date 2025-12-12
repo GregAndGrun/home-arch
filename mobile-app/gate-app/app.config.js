@@ -5,7 +5,7 @@ module.exports = {
     expo: {
     name: 'Smart Home',
     slug: 'smart-home',
-    version: '1.0.0',
+    version: '1.0.2',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -14,21 +14,25 @@ module.exports = {
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#000000',
+      backgroundColor: '#2196F3',
     },
     ios: {
       bundleIdentifier: 'com.grunert.smarthome',
       supportsTablet: true,
       jsEngine: 'hermes', // Enable Hermes for better performance and DevTools support
+      buildNumber: '3', // Increment for each App Store submission
       infoPlist: {
         // Notification permissions are handled by expo-notifications
+      },
+      config: {
+        usesNonExemptEncryption: false, // App uses only standard encryption (HTTPS, etc.)
       },
     },
     android: {
       package: 'com.smarthome.app',
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#F5A623',
+        backgroundColor: '#2196F3',
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
@@ -50,10 +54,11 @@ module.exports = {
         'expo-notifications',
         {
           icon: './assets/icon.png',
-          color: '#000000',
+          color: '#2196F3',
           sounds: [],
         },
       ],
+      './plugins/withNetworkSecurityConfig',
     ],
     web: {
       favicon: './assets/favicon.png',
@@ -67,6 +72,9 @@ module.exports = {
       gateGarageIp: process.env.GATE_GARAGE_IP || '192.168.0.103',
       gateGaragePort: process.env.GATE_GARAGE_PORT || '80',
       gateEntrancePort: process.env.GATE_ENTRANCE_PORT || '80',
+      // Tasmota IP addresses for blinds (port 80 by default)
+      blindsLivingRoomFixIp: process.env.BLINDS_LIVING_ROOM_FIX_IP || '192.168.0.104',
+      blindsLivingRoomTerraceIp: process.env.BLINDS_LIVING_ROOM_TERRACE_IP || '192.168.0.105',
       apiTimeout: parseInt(process.env.API_TIMEOUT || '10000', 10),
       apiRetryAttempts: parseInt(process.env.API_RETRY_ATTEMPTS || '3', 10),
       apiRetryDelay: parseInt(process.env.API_RETRY_DELAY || '1000', 10),

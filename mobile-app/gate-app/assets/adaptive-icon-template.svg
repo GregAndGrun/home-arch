@@ -1,30 +1,14 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- Żółte tło (mustard yellow) -->
-  <rect width="1024" height="1024" fill="#F5A623"/>
-  
-  <!-- Dom - biały kontur -->
-  <!-- Dach (trójkąt) - biały kontur -->
-  <path d="M 512 250 L 320 550 L 704 550 Z" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-  
-  <!-- Komin - mały prostokąt na dachu po prawej stronie -->
-  <rect x="620" y="200" width="60" height="80" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  
-  <!-- Ściany domu -->
-  <rect x="340" y="550" width="344" height="300" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-  
-  <!-- Drzwi -->
-  <rect x="480" y="720" width="104" height="130" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" rx="5"/>
-  
-  <!-- Okno lewe -->
-  <rect x="380" y="600" width="70" height="70" fill="none" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round" stroke-linejoin="round" rx="5"/>
-  <line x1="415" y1="600" x2="415" y2="670" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
-  <line x1="380" y1="635" x2="450" y2="635" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
-  
-  <!-- Okno prawe -->
-  <rect x="574" y="600" width="70" height="70" fill="none" stroke="#FFFFFF" stroke-width="25" stroke-linecap="round" stroke-linejoin="round" rx="5"/>
-  <line x1="609" y1="600" x2="609" y2="670" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
-  <line x1="574" y1="635" x2="644" y2="635" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round"/>
-  
-  <!-- Litera G - duża, biała, wyśrodkowana w środku domu -->
-  <text x="512" y="700" font-family="Arial, sans-serif" font-size="280" font-weight="bold" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">G</text>
+  <!-- Adaptive icon - tylko środkowa część będzie widoczna (bez zaokrąglonych rogów) -->
+  <!-- Niebieski kontur domu z literą G -->
+  <g transform="translate(512, 512)">
+    <!-- Dach (trójkąt) - niebieski kontur -->
+    <path d="M 0 -150 L -180 120 L 180 120 Z" fill="none" stroke="#2196F3" stroke-width="35" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Ściany domu -->
+    <rect x="-180" y="120" width="360" height="240" fill="none" stroke="#2196F3" stroke-width="35" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Litera G - duża, niebieska, wyśrodkowana w środku domu -->
+    <text x="0" y="60" font-family="Arial, sans-serif" font-size="240" font-weight="bold" fill="#2196F3" text-anchor="middle" dominant-baseline="central">G</text>
+  </g>
 </svg>

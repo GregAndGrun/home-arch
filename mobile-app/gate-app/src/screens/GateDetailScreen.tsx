@@ -14,6 +14,7 @@ import ActivityService from '../services/ActivityService';
 import NetInfo from '@react-native-community/netinfo';
 import SplitScreen from '../components/Layout/SplitScreen';
 import CircularGateControl from '../components/CircularGateControl';
+import BlindsControl from '../components/BlindsControl';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -21,11 +22,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 interface GateDetailScreenProps {
   gateType: GateType;
   onBack: () => void;
+  onAuthRequired?: (action: () => Promise<void>) => void;
 }
 
 const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   gateType,
   onBack,
+  onAuthRequired,
 }) => {
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
@@ -33,6 +36,14 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
   const [isConnected, setIsConnected] = useState(true);
   const [todayActivities, setTodayActivities] = useState<number[]>([]);
   const [hasRealActivities, setHasRealActivities] = useState(false);
+  const [blindsPosition, setBlindsPosition] = useState<number>(-1);
+  const [blindsLoading, setBlindsLoading] = useState(false);
+  const [headerPositionDisplay, setHeaderPositionDisplay] = useState<React.ReactNode>(null);
+  const [isDraggingBlinds, setIsDraggingBlinds] = useState(false);
+  const [blindsDirection, setBlindsDirection] = useState<number>(0); // -1 = closing, 0 = stopped, 1 = opening
+  const positionPollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isBlinds = gateType === GateType.LIVING_ROOM_FIX || gateType === GateType.LIVING_ROOM_TERRACE;
 
   const gateName = useMemo(() => {
     switch (gateType) {
@@ -40,10 +51,10 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
         return 'Garaż';
       case GateType.ENTRANCE:
         return 'Brama Wjazdowa';
-      case GateType.TERRACE_FIX:
-        return 'Roleta taras (fix)';
-      case GateType.TERRACE_DOOR:
-        return 'Roleta taras (drzwi)';
+      case GateType.LIVING_ROOM_FIX:
+        return 'Roleta salon (fix)';
+      case GateType.LIVING_ROOM_TERRACE:
+        return 'Roleta salon (taras)';
       default:
         return 'Brama';
     }
@@ -57,12 +68,54 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       setIsConnected(state.isConnected ?? false);
     });
 
-    loadTodayActivities();
+    // Load initial data
+    const loadInitialData = async () => {
+      await loadTodayActivities();
+      if (isBlinds) {
+        await loadBlindsStatus();
+      }
+    };
+    loadInitialData();
 
     return () => {
       unsubscribe();
+      // Cleanup polling interval
+      if (positionPollingIntervalRef.current) {
+        clearInterval(positionPollingIntervalRef.current);
+        positionPollingIntervalRef.current = null;
+      }
     };
-  }, [loadTodayActivities]);
+  }, [isBlinds]);
+
+  // Auto-refresh position - continuous polling to detect external changes (e.g., wall buttons)
+  useEffect(() => {
+    if (!isBlinds) return;
+
+    // Clear existing interval
+    if (positionPollingIntervalRef.current) {
+      clearInterval(positionPollingIntervalRef.current);
+      positionPollingIntervalRef.current = null;
+    }
+
+    // Always poll to detect external changes (wall buttons, etc.)
+    // Poll more frequently when moving, less frequently when stopped
+    const pollInterval = blindsDirection !== 0 ? 500 : 2000; // 500ms when moving, 2s when stopped
+    
+    const pollStatus = async () => {
+      if (isBlinds) {
+        await loadBlindsStatus();
+      }
+    };
+    
+    positionPollingIntervalRef.current = setInterval(pollStatus, pollInterval);
+
+    return () => {
+      if (positionPollingIntervalRef.current) {
+        clearInterval(positionPollingIntervalRef.current);
+        positionPollingIntervalRef.current = null;
+      }
+    };
+  }, [blindsDirection, isBlinds]);
 
   const loadTodayActivities = useCallback(async () => {
     try {
@@ -105,9 +158,40 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     }
   }, [gateType]);
 
+  const loadBlindsPosition = useCallback(async (): Promise<number> => {
+    if (!isBlinds) return -1;
+    try {
+      const position = await ApiService.getBlindsPosition(gateType);
+      setBlindsPosition(position);
+      return position;
+    } catch (error) {
+      console.error('[GateDetailScreen] Failed to load blinds position:', error);
+      setBlindsPosition(-1);
+      return -1;
+    }
+  }, [gateType, isBlinds]);
+
+  const loadBlindsStatus = useCallback(async () => {
+    if (!isBlinds) return;
+    try {
+      const status = await ApiService.getBlindsStatus(gateType);
+      setBlindsPosition(status.position);
+      setBlindsDirection(status.direction);
+      return status.direction !== 0; // Return true if moving
+    } catch (error) {
+      console.error('[GateDetailScreen] Failed to load blinds status:', error);
+      setBlindsPosition(-1);
+      setBlindsDirection(0);
+      return false;
+    }
+  }, [gateType, isBlinds]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadTodayActivities();
+    if (isBlinds) {
+      await loadBlindsStatus();
+    }
     setRefreshing(false);
   };
 
@@ -122,10 +206,106 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
       await ApiService.triggerGate(gateType);
       // Reload activities after successful trigger
       await loadTodayActivities();
+      if (isBlinds) {
+        setTimeout(() => loadBlindsStatus(), 200);
+      }
     } catch (error: any) {
+      if (error.message === 'AUTH_REQUIRED' && onAuthRequired) {
+        // Lazy authentication for ESP32 - retry after login
+        onAuthRequired(async () => {
+          await ApiService.triggerGate(gateType);
+          await loadTodayActivities();
+          if (isBlinds) {
+            setTimeout(() => loadBlindsStatus(), 200);
+          }
+        });
+        setTriggering(false);
+        return;
+      }
       Alert.alert('Błąd', error.message || 'Nie udało się sterować bramą');
     } finally {
       setTriggering(false);
+    }
+  };
+
+  // Blinds control handlers
+  const handleBlindsOpen = async () => {
+    if (!isConnected) {
+      Alert.alert('Brak połączenia', 'Sprawdź połączenie z siecią');
+      return;
+    }
+    setBlindsLoading(true);
+    try {
+      await ApiService.openGate(gateType);
+      await loadTodayActivities();
+      // Start polling immediately - loadBlindsStatus will detect movement
+      setTimeout(() => loadBlindsStatus(), 200);
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się otworzyć rolet');
+    } finally {
+      setBlindsLoading(false);
+    }
+  };
+
+  const handleBlindsClose = async () => {
+    if (!isConnected) {
+      Alert.alert('Brak połączenia', 'Sprawdź połączenie z siecią');
+      return;
+    }
+    setBlindsLoading(true);
+    try {
+      await ApiService.closeGate(gateType);
+      await loadTodayActivities();
+      // Start polling immediately - loadBlindsStatus will detect movement
+      setTimeout(() => loadBlindsStatus(), 200);
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się zamknąć rolet');
+    } finally {
+      setBlindsLoading(false);
+    }
+  };
+
+  const handleBlindsStop = async () => {
+    if (!isConnected) {
+      Alert.alert('Brak połączenia', 'Sprawdź połączenie z siecią');
+      return;
+    }
+    setBlindsLoading(true);
+    try {
+      await ApiService.stopBlinds(gateType);
+      await loadTodayActivities();
+      // Stop polling and get final position
+      if (positionPollingIntervalRef.current) {
+        clearInterval(positionPollingIntervalRef.current);
+        positionPollingIntervalRef.current = null;
+      }
+      await loadBlindsStatus();
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się zatrzymać rolet');
+    } finally {
+      setBlindsLoading(false);
+    }
+  };
+
+  const handleBlindsPositionChange = async (percentage: number) => {
+    console.log('[GateDetailScreen] handleBlindsPositionChange START:', { percentage, isConnected, gateType });
+    if (!isConnected) {
+      console.log('[GateDetailScreen] handleBlindsPositionChange BLOCKED: not connected');
+      Alert.alert('Brak połączenia', 'Sprawdź połączenie z siecią');
+      return;
+    }
+    setBlindsLoading(true);
+    try {
+      console.log('[GateDetailScreen] handleBlindsPositionChange calling ApiService.setBlindsPosition:', { percentage });
+      await ApiService.setBlindsPosition(gateType, percentage);
+      console.log('[GateDetailScreen] handleBlindsPositionChange ApiService.setBlindsPosition completed');
+      await loadTodayActivities();
+      // Start polling immediately - loadBlindsStatus will detect movement
+      setTimeout(() => loadBlindsStatus(), 200);
+    } catch (error: any) {
+      Alert.alert('Błąd', error.message || 'Nie udało się ustawić pozycji rolet');
+    } finally {
+      setBlindsLoading(false);
     }
   };
 
@@ -177,30 +357,53 @@ const GateDetailScreen: React.FC<GateDetailScreenProps> = ({
     );
   };
 
+  const headerContent = isBlinds && headerPositionDisplay ? headerPositionDisplay : null;
+
+  // Determine icon for header based on gate type
+  const getTitleIcon = (): keyof typeof MaterialIcons.glyphMap | undefined => {
+    if (isBlinds) return "blinds";
+    if (gateType === GateType.GARAGE) return "home";
+    if (gateType === GateType.ENTRANCE) return "directions-car";
+    return undefined;
+  };
+
   return (
-    <SplitScreen title={gateName} onBack={onBack}>
+    <SplitScreen title={gateName} titleIcon={getTitleIcon()} onBack={onBack} headerContent={headerContent}>
       <ScrollView
         contentContainerStyle={styles.contentContainer}
+        scrollEnabled={!isDraggingBlinds}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.accent} />
         }
       >
         <View style={styles.controlWrapper}>
-          <CircularGateControl
-            state={GateState.UNKNOWN}
-            onToggle={handleTrigger}
-            loading={triggering}
-            disabled={!isConnected}
-            gateType={
-              gateType === GateType.GARAGE
-                ? 'garage'
-                : gateType === GateType.TERRACE_FIX
-                ? 'terrace-fix'
-                : gateType === GateType.TERRACE_DOOR
-                ? 'terrace-door'
-                : 'entrance'
-            }
-          />
+          {isBlinds ? (
+            <BlindsControl
+              onOpen={handleBlindsOpen}
+              onClose={handleBlindsClose}
+              onStop={handleBlindsStop}
+              onPositionChange={handleBlindsPositionChange}
+              onPositionRefresh={loadBlindsPosition}
+              onPositionDisplayReady={setHeaderPositionDisplay}
+              onDragStateChange={setIsDraggingBlinds}
+              loading={blindsLoading}
+              disabled={!isConnected}
+              currentPosition={blindsPosition}
+              mockMode={false}
+            />
+          ) : (
+            <CircularGateControl
+              state={GateState.UNKNOWN}
+              onToggle={handleTrigger}
+              loading={triggering}
+              disabled={!isConnected}
+              gateType={
+                gateType === GateType.GARAGE
+                  ? 'garage'
+                  : 'entrance'
+              }
+            />
+          )}
         </View>
 
         <GraphPlaceholder />

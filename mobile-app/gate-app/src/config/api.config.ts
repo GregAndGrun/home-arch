@@ -11,6 +11,10 @@ export const DEFAULT_GATE_GARAGE_IP = extra.gateGarageIp || '192.168.0.103';
 export const DEFAULT_GATE_ENTRANCE_PORT = extra.gateEntrancePort || '80';
 export const DEFAULT_GATE_GARAGE_PORT = extra.gateGaragePort || '80';
 
+// Tasmota IP addresses for blinds (port 80 by default)
+export const DEFAULT_BLINDS_LIVING_ROOM_FIX_IP = extra.blindsLivingRoomFixIp || '192.168.0.104';
+export const DEFAULT_BLINDS_LIVING_ROOM_TERRACE_IP = extra.blindsLivingRoomTerraceIp || '192.168.0.105';
+
 // API endpoints
 export const API_ENDPOINTS = {
   LOGIN: '/api/auth/login',

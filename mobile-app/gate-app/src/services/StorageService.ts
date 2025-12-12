@@ -380,6 +380,7 @@ export class StorageService {
     }
   }
 
+
   // Clear all data
   static async clearAll(): Promise<void> {
     await this.clearToken();

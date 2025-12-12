@@ -48,10 +48,14 @@ export const useGatewayReachability = () => {
         return;
       }
 
+      // Health check should not require authentication - it's public endpoint
+      // Use short timeout to avoid blocking app
       await ApiService.checkHealth();
       setStatus('online');
       setMessage(null);
     } catch (error) {
+      // ESP32 unavailable - set status but don't force login
+      // App should work without ESP32 (for Sonoff devices)
       setStatus('vpn-required');
       if (error instanceof Error && error.message && !error.message.includes('No response')) {
         setMessage(error.message);

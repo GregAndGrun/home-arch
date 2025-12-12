@@ -84,19 +84,26 @@ void setup() {
   // Initialize watchdog timer to prevent system hangs
   esp_task_wdt_init(WATCHDOG_TIMEOUT / 1000, true); // Convert ms to seconds
   esp_task_wdt_add(NULL); // Add current task to watchdog
+  
+  // Reset watchdog after initialization
+  esp_task_wdt_reset();
 
   // Initialize authentication system
   auth.begin();
+  esp_task_wdt_reset(); // Reset watchdog after auth init
 
   // Connect to WiFi (restart on failure during initial setup)
   setupWiFi(true);
+  esp_task_wdt_reset(); // Reset watchdog after WiFi setup
 
   // Setup NTP time synchronization
   setupNTP();
+  esp_task_wdt_reset(); // Reset watchdog after NTP setup
 
   // Setup mDNS
   if (ENABLE_MDNS) {
     setupMDNS();
+    esp_task_wdt_reset(); // Reset watchdog after mDNS setup
   }
 
   // Initialize web server
@@ -108,12 +115,14 @@ void setup() {
     gate2,
     #endif
     auth);
+  esp_task_wdt_reset(); // Reset watchdog after web server setup
 
   // Start server
   server.begin();
   
   // Setup OTA updates
   setupOTA();
+  esp_task_wdt_reset(); // Reset watchdog after OTA setup
   
   #if ENABLE_SERIAL_LOG
   Serial.println("HTTP server started on port " + String(HTTP_PORT));
@@ -143,15 +152,17 @@ void loop() {
   #if ENABLE_GATE2
   gate2.update();
   #endif
+  esp_task_wdt_reset(); // Reset watchdog after gate updates
 
   // Update authentication (cleanup expired tokens, rate limiting)
   auth.update();
+  esp_task_wdt_reset(); // Reset watchdog after auth update
 
   // Keep WiFi alive
   static unsigned long lastWiFiCheck = 0;
   static unsigned long wifiDownSince = 0;
 
-  if (millis() - lastWiFiCheck > 1000) { // Check status every second
+  if (millis() - lastWiFiCheck > WIFI_CHECK_INTERVAL) { // Check status every WIFI_CHECK_INTERVAL ms
     if (WiFi.status() != WL_CONNECTED) {
       // If we just lost connection, record the time
       if (wifiDownSince == 0) {
@@ -214,6 +225,12 @@ void setupWiFi(bool restartOnFailure) {
   // OPTIMIZATION: Explicitly enable auto-reconnect and disable sleep
   WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);
+  
+  // Additional WiFi stability settings
+  // Set maximum power for better range and stability
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  // Use 802.11n mode for better stability (if supported)
+  WiFi.setPhyMode(WIFI_PHY_MODE_11N);
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 

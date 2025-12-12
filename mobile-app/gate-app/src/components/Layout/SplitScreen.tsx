@@ -21,7 +21,7 @@ const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerConte
   // Zapamiętaj gradient - nie przeliczaj przy każdym renderze
   const gradientColors = useMemo(() => {
     const [gradientStart, gradientEnd] = generateGradient(accentColor);
-    return [gradientEnd, accentColor, gradientStart];
+    return [gradientEnd, accentColor, gradientStart] as const;
   }, [accentColor]);
 
   // Animacje tylko dla contentu (nie dla headera!)
@@ -114,37 +114,39 @@ const SplitScreen: React.FC<SplitScreenProps> = ({ title, titleIcon, headerConte
             )}
             {title && (
               <View style={styles.titleContainer}>
-                {titleIcon && (
-                  <Animated.View 
-                    style={{ 
-                      marginRight: 12,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      transform: [
-                        { scale: iconScaleAnim },
-                        { rotate: iconRotationAnim.interpolate({
-                          inputRange: [-0.3, 0],
-                          outputRange: ['-0.3rad', '0rad'],
-                        })},
-                      ],
-                      opacity: iconOpacityAnim,
-                    }}
+                <View style={styles.titleWithIcon}>
+                  {titleIcon && (
+                    <Animated.View 
+                      style={{ 
+                        marginRight: 8,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        transform: [
+                          { scale: iconScaleAnim },
+                          { rotate: iconRotationAnim.interpolate({
+                            inputRange: [-0.3, 0],
+                            outputRange: ['-0.3rad', '0rad'],
+                          })},
+                        ],
+                        opacity: iconOpacityAnim,
+                      }}
+                    >
+                      <MaterialIcons name={titleIcon} size={32} color="#FFFFFF" />
+                    </Animated.View>
+                  )}
+                  <Text 
+                    style={[
+                      styles.headerTitle, 
+                      { 
+                        fontFamily: typography.fontFamily.bold,
+                        includeFontPadding: false,
+                        textAlignVertical: 'center',
+                      }
+                    ]}
                   >
-                    <MaterialIcons name={titleIcon} size={32} color="#FFFFFF" />
-                  </Animated.View>
-                )}
-                <Text 
-                  style={[
-                    styles.headerTitle, 
-                    { 
-                      fontFamily: typography.fontFamily.bold,
-                      includeFontPadding: false,
-                      textAlignVertical: 'center',
-                    }
-                  ]}
-                >
-                  {title}
-                </Text>
+                    {title}
+                  </Text>
+                </View>
               </View>
             )}
             {headerContent && (
@@ -227,7 +229,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 15,
     marginBottom: 20,
-    height: 32,
+    minHeight: 40,
+  },
+  titleWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 28,
@@ -235,7 +242,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     includeFontPadding: false,
     textAlignVertical: 'center',
-    lineHeight: 32,
+    lineHeight: 36,
+    height: 36,
+  },
+  headerPositionWrapper: {
+    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   contentContainer: {
     flex: 1,

@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Favicon - mniejszy rozmiar, uproszczony -->
+  <!-- Niebieski kontur domu z literą G -->
+  <g transform="translate(256, 256)">
+    <!-- Dach (trójkąt) - niebieski kontur -->
+    <path d="M 0 -100 L -120 80 L 120 80 Z" fill="none" stroke="#2196F3" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Ściany domu -->
+    <rect x="-120" y="80" width="240" height="160" fill="none" stroke="#2196F3" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Litera G - mniejsza, niebieska -->
+    <text x="0" y="40" font-family="Arial, sans-serif" font-size="140" font-weight="bold" fill="#2196F3" text-anchor="middle" dominant-baseline="central">G</text>
+  </g>
+</svg>
+
