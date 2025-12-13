@@ -16,9 +16,10 @@ import { StorageService } from '../services/StorageService';
 interface HomeScreenProps {
   onCategoryPress: (category: DeviceCategory | 'all') => void;
   onLogout: () => void;
+  onBack?: () => void;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ onCategoryPress, onLogout }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({ onCategoryPress, onLogout, onBack }) => {
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<DeviceCategory | 'all'>('all');
@@ -65,6 +66,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onCategoryPress, onLogout }) =>
       <CategoryHeader 
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
+        onBack={onBack}
       />
     </View>
   ), [username, selectedCategory]);
@@ -72,6 +74,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onCategoryPress, onLogout }) =>
   return (
     <SplitScreen 
       headerContent={HeaderContent}
+      onBack={onBack}
     >
       <ScrollView
         contentContainerStyle={styles.contentContainer}

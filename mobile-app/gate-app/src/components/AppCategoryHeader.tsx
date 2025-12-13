@@ -1,33 +1,25 @@
 import React, { useRef, memo, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Text, StyleSheet, View, Animated } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, View, Animated, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 import { typography } from '../theme/typography';
-import { DeviceCategory } from '../types';
+import { AppCategory } from '../screens/AppCategoriesScreen';
 
-interface CategoryHeaderProps {
-  selectedCategory: DeviceCategory | 'all';
-  onSelectCategory: (category: DeviceCategory | 'all') => void;
-  onBack?: () => void;
+interface AppCategoryHeaderProps {
+  selectedCategory: AppCategory | null;
+  onSelectCategory: (category: AppCategory) => void;
 }
 
-interface CategoryHeaderProps {
-  selectedCategory: DeviceCategory | 'all';
-  onSelectCategory: (category: DeviceCategory | 'all') => void;
-  onBack?: () => void;
-}
-
-const categories: { id: DeviceCategory | 'all'; label: string; icon: keyof typeof MaterialIcons.glyphMap }[] = [
-  { id: 'all', label: 'Wszystkie', icon: 'dashboard' },
-  { id: 'gates', label: 'Rolety', icon: 'blinds' },
-  { id: 'lights', label: 'Oświetlenie', icon: 'lightbulb' },
-  { id: 'temperature', label: 'Temperatura', icon: 'thermostat' },
-  { id: 'devices', label: 'Urządzenia', icon: 'devices' },
+const categories: { id: AppCategory; label: string; icon: keyof typeof MaterialIcons.glyphMap }[] = [
+  { id: 'calendar', label: 'Kalendarz', icon: 'calendar-today' },
+  { id: 'smart-home', label: 'Smart Home', icon: 'home' },
+  { id: 'shopping-list', label: 'Zakupy', icon: 'shopping-cart' },
+  { id: 'notes', label: 'Notatki', icon: 'note' },
 ];
 
 // Animated category item component
 const AnimatedCategoryItem: React.FC<{
-  cat: { id: DeviceCategory | 'all'; label: string; icon: keyof typeof MaterialIcons.glyphMap };
+  cat: { id: AppCategory; label: string; icon: keyof typeof MaterialIcons.glyphMap };
   index: number;
   isSelected: boolean;
   onPress: () => void;
@@ -78,66 +70,36 @@ const AnimatedCategoryItem: React.FC<{
   );
 };
 
-const CategoryHeader: React.FC<CategoryHeaderProps> = ({ selectedCategory, onSelectCategory, onBack }) => {
+const AppCategoryHeader: React.FC<AppCategoryHeaderProps> = ({ selectedCategory, onSelectCategory }) => {
   const { colors } = useTheme();
-  const scrollViewRef = useRef<ScrollView>(null);
-  // Start with opacity 1 to prevent flickering
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const hasAnimatedRef = useRef(false);
-
-  useEffect(() => {
-    // Only animate on first mount, not on every render
-    if (!hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-      fadeAnim.setValue(0);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, []);
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+    <View style={styles.container}>
       <ScrollView
-        ref={scrollViewRef}
-        key="category-scroll" // Stable key to prevent reset
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        scrollEventThrottle={16}
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-        }}
         removeClippedSubviews={false}
         collapsable={false}
       >
-        {onBack && (
-          <AnimatedCategoryItem
-            cat={{ id: 'back' as any, label: 'Wstecz', icon: 'arrow-back' }}
-            index={-1}
-            isSelected={false}
-            onPress={onBack}
-          />
-        )}
         {categories.map((cat, index) => (
           <AnimatedCategoryItem
             key={cat.id}
             cat={cat}
-            index={onBack ? index : index + 1}
+            index={index}
             isSelected={selectedCategory === cat.id}
             onPress={() => onSelectCategory(cat.id)}
           />
         ))}
       </ScrollView>
-    </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 12, // Increased to center categories vertically between title and bottom edge
+    marginTop: 12,
   },
   scrollContent: {
     paddingLeft: 30,
@@ -163,4 +125,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default memo(CategoryHeader);
+export default memo(AppCategoryHeader);
+

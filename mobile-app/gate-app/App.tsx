@@ -4,10 +4,15 @@ import { View, ActivityIndicator, StyleSheet, AppState, AppStateStatus, Platform
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 // import { useFonts } from 'expo-font'; // Not used - removed to prevent potential issues
 import LoginScreen from './src/screens/LoginScreen';
+import AppCategoriesScreen, { AppCategory } from './src/screens/AppCategoriesScreen';
+import SmartHomeScreen from './src/screens/SmartHomeScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import GatesScreen from './src/screens/GatesScreen';
 import GateDetailScreen from './src/screens/GateDetailScreen';
 import CategoryDevicesScreen from './src/screens/CategoryDevicesScreen';
+import CalendarScreen from './src/screens/CalendarScreen';
+import NotesScreen from './src/screens/NotesScreen';
+import ShoppingListScreen from './src/screens/ShoppingListScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import BiometricLockScreen from './src/screens/BiometricLockScreen';
@@ -21,7 +26,7 @@ import { SmartDevice, GateType, DeviceCategory, DeviceType } from './src/types';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { useGatewayReachability } from './src/hooks/useGatewayReachability';
 
-type Screen = 'home' | 'gate-detail' | 'settings' | 'category-devices';
+type Screen = 'app-categories' | 'smart-home' | 'calendar' | 'notes' | 'shopping-list' | 'home' | 'gate-detail' | 'settings' | 'category-devices';
 
 function AppContent() {
   const { colors } = useTheme();
@@ -30,13 +35,14 @@ function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [showLoginForAction, setShowLoginForAction] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('app-categories');
   const [currentTab, setCurrentTab] = useState<TabRoute>('home');
+  const [selectedAppCategory, setSelectedAppCategory] = useState<AppCategory | null>('calendar');
   const [selectedGateType, setSelectedGateType] = useState<GateType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<DeviceCategory | 'all' | null>(null);
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
   const [previousCategory, setPreviousCategory] = useState<DeviceCategory | 'all' | null>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current; // Start with 1 for smooth transitions
   const slideAnim = useRef(new Animated.Value(20)).current;
   const [showAnimatedContent, setShowAnimatedContent] = useState(false);
   const { refresh: refreshGatewayStatus } = useGatewayReachability();
@@ -305,6 +311,12 @@ function AppContent() {
     // For other device types, could navigate to detail screens
   };
 
+  const handleAppCategoryPress = (category: AppCategory) => {
+    setSelectedAppCategory(category);
+    // Stay on app-categories screen, just change selected category
+    setCurrentScreen('app-categories');
+  };
+
   const handleCategoryPress = (category: DeviceCategory | 'all') => {
     // For all categories including 'gates', use CategoryDevicesScreen for consistency
     if (category === 'all') {
@@ -341,19 +353,15 @@ function AppContent() {
         // Fallback to category-devices with previous category or 'all'
         setCurrentScreen('category-devices');
         setSelectedCategory(previousCategory || 'all');
-        setPreviousScreen(null);
-        setPreviousCategory(null);
       }
-      setSelectedGateType(null);
     } else if (currentScreen === 'category-devices') {
-      setCurrentScreen('home');
+      // Return to app-categories with smart-home selected
+      setCurrentScreen('app-categories');
+      setSelectedAppCategory('smart-home');
       setSelectedCategory(null);
-    } else if (currentTab === 'settings') {
-      setCurrentTab('home');
-      setCurrentScreen('home');
-    } else if (currentTab === 'stats') {
-      setCurrentTab('home');
-      setCurrentScreen('home');
+    } else if (currentScreen === 'home') {
+      // Return to app-categories from home (legacy)
+      setCurrentScreen('app-categories');
     } else {
       return false; // Allow default back action (exit app)
     }
@@ -377,13 +385,13 @@ function AppContent() {
         return false; // Allow default behavior
       }
 
-      // If we're not on home screen, go back
-      if (currentScreen !== 'home' || currentTab !== 'home') {
+      // If we're not on app-categories screen, go back
+      if (currentScreen !== 'app-categories' || currentTab !== 'home') {
         handleBack();
         return true; // Prevent default behavior (closing app)
       }
 
-      // If we're on home screen, allow default behavior (close app)
+      // If we're on app-categories screen, allow default behavior (close app)
       return false;
     });
 
@@ -392,8 +400,9 @@ function AppContent() {
 
   const handleLogoutFromScreen = async () => {
     await handleLogout();
-    setCurrentScreen('home');
+    setCurrentScreen('app-categories');
     setCurrentTab('home');
+    setSelectedAppCategory(null);
     setSelectedGateType(null);
     setSelectedCategory(null);
   };
@@ -401,7 +410,8 @@ function AppContent() {
   const handleTabNavigate = (route: TabRoute) => {
     setCurrentTab(route);
     if (route === 'home') {
-      setCurrentScreen('home');
+      // Return to app-categories when home tab is selected
+      setCurrentScreen('app-categories');
     } else if (route === 'settings') {
       setCurrentScreen('settings');
     } else if (route === 'stats') {
@@ -444,6 +454,30 @@ function AppContent() {
     }
 
     switch (currentScreen) {
+      case 'app-categories':
+        return (
+          <View style={{ flex: 1 }}>
+            <AppCategoriesScreen
+              onCategoryPress={handleAppCategoryPress}
+              selectedCategory={selectedAppCategory || 'calendar'}
+              onDevicePress={handleDevicePress}
+              onSmartHomeCategorySelect={handleCategoryPress}
+            />
+          </View>
+        );
+      case 'smart-home':
+        return (
+          <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+            <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
+              <SmartHomeScreen
+                onCategoryPress={handleCategoryPress}
+                onDevicePress={handleDevicePress}
+                onLogout={handleLogoutFromScreen}
+                onBack={handleBack}
+              />
+            </SwipeBackGesture>
+          </Animated.View>
+        );
       case 'home':
         return (
           <Animated.View
@@ -461,37 +495,40 @@ function AppContent() {
         );
       case 'category-devices':
         return (
-          <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
-            <CategoryDevicesScreen
-              category={selectedCategory || 'all'}
-              onDevicePress={handleDevicePress}
-              onCategorySelect={(category) => {
-                if (category === 'all') {
-                  setSelectedCategory('all');
-                } else {
-                  setSelectedCategory(category as DeviceCategory);
-                }
-                // Stay on category-devices screen for all categories
-              }}
-            />
-          </SwipeBackGesture>
+          <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+            <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
+              <CategoryDevicesScreen
+                category={selectedCategory || 'all'}
+                onDevicePress={handleDevicePress}
+                onCategorySelect={(category) => {
+                  if (category === 'all') {
+                    setSelectedCategory('all');
+                  } else {
+                    setSelectedCategory(category as DeviceCategory);
+                  }
+                  // Stay on category-devices screen for all categories
+                }}
+              />
+            </SwipeBackGesture>
+          </Animated.View>
         );
       // Removed 'gates' case - now using CategoryDevicesScreen for all categories
       case 'gate-detail':
         return selectedGateType ? (
-          <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
-            <GateDetailScreen
-              gateType={selectedGateType}
-              onBack={handleBack}
-              onAuthRequired={handleAuthRequired}
-            />
-          </SwipeBackGesture>
+          <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+            <SwipeBackGesture onSwipeBack={handleBack} enabled={true}>
+              <GateDetailScreen
+                gateType={selectedGateType}
+                onBack={handleBack}
+                onAuthRequired={handleAuthRequired}
+              />
+            </SwipeBackGesture>
+          </Animated.View>
         ) : null;
       default:
         return (
-          <HomeScreen
-            onCategoryPress={handleCategoryPress}
-            onLogout={handleLogoutFromScreen}
+          <AppCategoriesScreen
+            onCategoryPress={handleAppCategoryPress}
           />
         );
     }
